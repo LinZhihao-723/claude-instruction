@@ -176,3 +176,158 @@ Dependencies are specified inside `Cargo.toml` with the requirements:
 * The version requirement must be given to the exact patch version, for example, `1.2.3` instead of
   `^1.2` or `~1.2`.
 * The dependencies must be sorted alphabetically by the package name.
+* Remove unused dependencies. Do not leave stale entries in `Cargo.toml`.
+
+# Enum vs Trait Objects
+
+Prefer enum dispatch over trait objects (`Box<dyn Trait>`) when all variant types are known at compile
+time:
+
+```rust
+// Preferred: all types known at compile time
+enum IngestionJob {
+    SqsListener(SqsListener),
+    S3Scanner(S3Scanner),
+}
+
+// Avoid: unnecessary dynamic dispatch
+Box<dyn IngestionJob>
+```
+
+Reasons:
+
+* More compact memory layout.
+* Enforces explicit handling for all variants (no missing match arms).
+* No virtual function overhead.
+* Follows the same philosophy as C++ `std::variant` over inheritance.
+
+Only use trait objects when the set of types is truly dynamic or unknown at compile time.
+
+# Ownership and Efficiency
+
+## Pass ownership instead of borrowing when the callee needs owned data
+
+If a function receives a reference but then clones or reconstructs an owned value from it, pass
+ownership directly:
+
+```rust
+// Bad: callee reconstructs a Vec from the reference
+fn submit(ids: &[u64]) {
+    let owned = ids.to_vec(); // unnecessary copy
+    ...
+}
+
+// Good: pass ownership down the call chain
+fn submit(ids: Vec<u64>) {
+    ...
+}
+```
+
+## Use `&str` for read-only string access
+
+When a function only needs to read a string value (e.g., checking prefixes, logging), accept `&str`
+rather than `&String` or `&NonEmptyString`.
+
+## Use `u64` for sizes that may exceed 32-bit
+
+Prefer `u64` over `usize` for sizes that may exceed the 32-bit range (e.g., S3 object sizes,
+accumulated buffer sizes), since `usize` is platform-dependent. For size config variables, use
+`xxx_size` without a `_bytes` suffix -- the unit always defaults to bytes.
+
+# Type-Level Validation
+
+Use newtype wrappers to enforce invariants at the type level rather than relying on runtime
+validation:
+
+* Use `NonEmptyString` for config fields that must not be empty.
+* Wrap validated configs in dedicated types and pass them through the call chain, so downstream code
+  can trust the invariants without re-validating.
+
+```rust
+// Good: validation at type level
+pub struct ValidatedSqsListenerConfig { /* ... */ }
+
+impl ValidatedSqsListenerConfig {
+    pub fn validate_and_create(raw: SqsListenerConfig) -> Result<Self, Error> { /* ... */ }
+}
+```
+
+# Mirroring Python Types
+
+When Rust types mirror existing Python definitions in the codebase:
+
+* Document the Python source in a doc comment.
+* Add a note if the type is partially defined (unused fields omitted).
+* Defaults must be kept in sync.
+
+```rust
+/// Mirror of `job_orchestration.scheduler.constants.QueryJobStatus`. Must be kept in sync.
+///
+/// # NOTE
+///
+/// * This type is partially defined: unused fields are omitted and discarded through
+///   deserialization.
+/// * The default values must be kept in sync with the Python definition.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SomeConfig {
+    // ...
+}
+```
+
+# Testing
+
+## No `unwrap` in tests
+
+Use `expect("descriptive message")` even in test code. This rule applies everywhere, including tests.
+
+## Use `anyhow::Result` in test functions
+
+```rust
+#[tokio::test]
+async fn test_something() -> anyhow::Result<()> {
+    let result = do_something().await?;
+    assert_eq!(result, expected);
+    Ok(())
+}
+```
+
+## Prefer real-time testing for complex async code
+
+Avoid `tokio::time::pause()` when the implementation uses `select!` in long-running loops. Time
+simulation only guarantees ordering for `sleep` calls and does not reliably control `select!`
+behavior. Use real-time testing with appropriate timeouts instead.
+
+## Use mock/noop states for unit tests
+
+Implement trivial noop or mock state structs so that unit tests don't require external services
+(e.g., databases). Trait-based state abstractions enable this pattern.
+
+# Module Organization
+
+## Shorten internal type names
+
+When a type is internal to a module, use a short name and let users reference it via the module path:
+
+```rust
+// Inside ingestion_job/sqs_listener.rs
+pub struct SqsListener { /* ... */ }
+struct Task { /* ... */ }  // internal, shortened from SqsListenerTask
+
+// Users reference as:
+use ingestion_job::SqsListener;
+```
+
+## Dedicated error files
+
+For components with multiple error types, create a dedicated `error.rs` module rather than defining
+errors inline.
+
+## Reusable code belongs in `clp-rust-utils`
+
+If code in `api-server` or `log-ingestor` could be shared across components, it should be moved to
+`clp-rust-utils`. Examples:
+
+* MySQL pool creation utilities
+* Config structs and deserialization
+* AWS client creation helpers
+* Common type definitions (e.g., job IDs)
