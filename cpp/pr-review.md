@@ -264,6 +264,9 @@ Use Doxygen-style `/**` block comments.
 - Always insert a **blank `*` line** between the description and `@param` / `@return` tags.
 - All descriptions, `@param`, `@return`, and `@throw` lines must end with a **period**.
 - Do not indent continuation lines under `@param` / `@return` bullet points.
+- Parameters whose meaning is obvious from the name alone (e.g., `@param reader`, `@param tag`) do
+  **not** require a description -- listing just the name is sufficient. Only add a description when
+  the parameter needs clarification beyond what the name conveys.
 
 ### 5.2 `@param` for Output Parameters
 
@@ -392,6 +395,12 @@ Value(Value&&) = default;
 auto operator=(Value&&) -> Value& = default;
 virtual ~Value() = default;
 ```
+
+**Exception -- abstract base classes (interfaces)**: Classes that serve as pure interfaces (with at
+least one pure virtual method) only need a virtual destructor. They do **not** require explicit
+copy/move declarations since they cannot be instantiated directly. If a class appears to be an
+interface but has no pure virtual methods, flag it during review -- it should either have at least
+one `= 0` method or follow the full Rule of Five.
 
 ### 6.3 Member Initialization at Declaration Site
 
