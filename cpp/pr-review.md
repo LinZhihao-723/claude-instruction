@@ -293,6 +293,8 @@ Follow this exact template:
 ```
 
 - For void results: `@return A void result on success, or an error code indicating the failure:`
+- For abstract methods whose error codes depend on derived classes:
+  `- Error codes are defined by the derived class.`
 - List **direct errors before forwarded errors**.
 - Do not use backticks around error code enum values in `@return` lists.
 - Do not specify the full namespace if the error code is resolvable from the current namespace.
@@ -325,6 +327,9 @@ Do not add "or not" in a "whether" return statement:
 - Avoid starting with "Class for" or "This class is" -- these are redundant.
   - Good: `Handler for KV-pair IR stream search queries.`
   - Bad: `Class for handling KV-pair IR stream search queries.`
+- When a class is designed to be used by a specific caller, mention it:
+  - Good: `Virtual base class defining methods for deserializing IR units and log events called by
+    \`Deserializer\`.`
 - Enum value descriptions go as **inline comments above each value**, not in the class docstring.
 
 ### 5.7 Error Message Strings
@@ -341,7 +346,38 @@ Do not add "or not" in a "whether" return statement:
 "Integer value exceeds the 64-bit signed integer range."
 ```
 
-### 5.8 Docstrings Must Stay in Sync
+### 5.8 Derived Class Override Docstrings
+
+Derived class method overrides should **not** duplicate the base class's full docstring. Only
+document what is specific to the override -- typically the concrete error codes:
+
+```cpp
+// Good -- only documents what's specific to this override
+/**
+ * The possible error codes:
+ * - IrDeserializationErrorEnum::InvalidTag if the tag doesn't represent a valid IR unit.
+ * - Forwards `deserialize_tag`'s return values on failure.
+ */
+[[nodiscard]] auto deserialize_ir_unit_type(ReaderInterface& reader)
+        -> Result<IrUnitType> override;
+
+// Bad -- duplicates the base class description
+/**
+ * Deserializes the type of the next IR unit from the given reader.
+ * @param reader
+ * @return A result containing the IR unit type on success, or an error code indicating the
+ * failure:
+ * - IrDeserializationErrorEnum::InvalidTag if the tag doesn't represent a valid IR unit.
+ */
+```
+
+### 5.9 Function Name Accuracy in Doxygen
+
+References to function names in Doxygen comments must use the **exact** function name. Do not
+abbreviate or use an outdated name. If a method is named `deserialize_ir_unit_utc_offset_change`,
+do not refer to it as `deserialize_utc_offset_change`.
+
+### 5.10 Docstrings Must Stay in Sync
 
 When parameters are added/removed, return codes change, or implementation changes, the docstring
 **must** be updated accordingly in the same PR.
@@ -367,6 +403,15 @@ Within a class, follow this order:
    - `// Constructor` (private constructors)
    - `// Methods`
    - `// Variables`
+
+In derived classes, label the override section as `// Methods implementing \`BaseClassName\``:
+
+```cpp
+public:
+    // Methods implementing `DeserializerImpl`
+    [[nodiscard]] auto deserialize_ir_unit_type(ReaderInterface& reader)
+            -> Result<IrUnitType> override;
+```
 
 Static variables come before methods. Static methods come before constructors. Definition order
 must match declaration order.
@@ -396,11 +441,25 @@ auto operator=(Value&&) -> Value& = default;
 virtual ~Value() = default;
 ```
 
-**Exception -- abstract base classes (interfaces)**: Classes that serve as pure interfaces (with at
-least one pure virtual method) only need a virtual destructor. They do **not** require explicit
-copy/move declarations since they cannot be instantiated directly. If a class appears to be an
-interface but has no pure virtual methods, flag it during review -- it should either have at least
-one `= 0` method or follow the full Rule of Five.
+**Abstract base classes**: Even abstract base classes should declare all five special members
+explicitly -- clang-tidy flags missing declarations regardless of whether the class has pure virtual
+methods. Typically: delete copy, default move, and add a virtual destructor:
+
+```cpp
+// Delete copy constructor and assignment operator
+DeserializerImpl(DeserializerImpl const&) = delete;
+auto operator=(DeserializerImpl const&) -> DeserializerImpl& = delete;
+
+// Default move constructor and assignment operator
+DeserializerImpl(DeserializerImpl&&) noexcept = default;
+auto operator=(DeserializerImpl&&) noexcept -> DeserializerImpl& = default;
+
+// Destructor
+virtual ~DeserializerImpl() = default;
+```
+
+If a class appears to be an interface but has no pure virtual methods, flag it during review -- it
+should either have at least one `= 0` method or follow the full Rule of Five.
 
 ### 6.3 Member Initialization at Declaration Site
 
@@ -437,11 +496,17 @@ private:
 };
 ```
 
-### 6.5 `explicit` on Single-Parameter Constructors
+### 6.5 Static Methods
+
+If a method does not use `this`, make it `static`. Check clang-tidy warnings for
+`readability-convert-member-functions-to-static`. Static methods should be placed before
+constructors per the member ordering in section 6.1.
+
+### 6.6 `explicit` on Single-Parameter Constructors
 
 Always mark single-parameter constructors as `explicit` to prevent implicit conversions.
 
-### 6.6 Structs vs. Classes
+### 6.7 Structs vs. Classes
 
 - Use `struct` when all members should be immutable (public `const` members).
 - Avoid aggregate initialization; prefer constructors for predictable initialization.
@@ -688,6 +753,7 @@ Address all clang-tidy violations in newly added files.
 - `cppcoreguidelines-special-member-functions` -- missing deleted/defaulted special members.
 - `readability-identifier-naming` -- naming convention violations.
 - `cppcoreguidelines-avoid-const-or-ref-data-members` -- `const` or reference class members.
+- `readability-convert-member-functions-to-static` -- methods that don't use `this`.
 
 ---
 

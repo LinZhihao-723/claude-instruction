@@ -130,7 +130,18 @@ Note: You don't need a docstring for the following situations:
 * The function is simple enough, for example, a getter or a setter.
 * The function is an implementation of a trait function, and the trait function already has a
   docstring.
-* The struct member is private. 
+* The struct member is private.
+
+Additional docstring rules:
+
+* Only add a `# Parameters` section in **trait declarations**. Do not add it to trait
+  implementations or regular functions -- the parameter names and types should be self-documenting.
+* Always leave a **blank line** before a docstring block comment (i.e., before `///`).
+* Forwarded error documentation must name the **exact function** being forwarded. For example, use
+  `Forwards [`sqlx::query::Query::fetch_optional`]'s return values on failure.` not a generic
+  `Forwards sqlx error`. Be careful to use the correct function name.
+* When error variants are removed or code paths that produce certain errors are deleted, **remove the
+  dead error enum variants** as well.
 
 # Symbol ordering
 
@@ -164,8 +175,11 @@ We name trait as a type, for example, `Cache` instead of `CacheTrait` or `CacheT
 
 We use long descriptive names for generic type parameters, instead of single letters.
 
-* For lifetime parameters, we use `'lifetime_name`, for example, `'cache_lifetime`.
-* For type parameters, we use `XxxType`, for example, `CacheType`.
+* For lifetime parameters, we use `'lifetime_name`, for example, `'cache_lifetime`. Short single-letter
+  lifetimes like `'r` and `'q` are acceptable when their meaning is clear from context (e.g., sqlx
+  trait impls).
+* For type parameters, we use `UpperCamelCase` names, for example, `CacheType`, `Db`. Do **not** use
+  all-caps like `DB` -- use `Db` instead.
   * We prefer to put type constraints in the type parameter, for example, `CacheType: Cache` instead
     of `CacheType` with a `where CacheType: Cache` clause.
 
@@ -234,6 +248,65 @@ Prefer `u64` over `usize` for sizes that may exceed the 32-bit range (e.g., S3 o
 accumulated buffer sizes), since `usize` is platform-dependent. For size config variables, use
 `xxx_size` without a `_bytes` suffix -- the unit always defaults to bytes.
 
+## Prefer `u64` seconds over `Duration` for time config
+
+When a function only needs whole-second precision (e.g., DB expiry thresholds), accept `u64` directly
+(e.g., `expire_after_sec: u64`) rather than `Duration`. This avoids sub-second precision loss from
+`Duration::as_secs()` and makes the API simpler.
+
+# Type Aliases for External Types
+
+Create `pub type` aliases for external types used across the codebase instead of using raw types
+directly. This centralizes the dependency and improves readability:
+
+```rust
+// Good: alias in the ID module
+pub type UuidBytes = uuid::Bytes;
+
+// Bad: raw [u8; 16] scattered everywhere
+fn get_bytes(&self) -> &[u8; 16] { ... }
+```
+
+# Prefer Booleans Over Small Enum Subsets
+
+When a function only needs to express a binary choice (e.g., whether a cleanup or commit task
+exists), use a `bool` parameter instead of creating a mirror enum of state subsets:
+
+```rust
+// Good: simple boolean parameter
+async fn cancel(&self, job_id: JobId, has_cleanup_task: bool) -> Result<(), DbError>;
+
+// Bad: unnecessary enum that mirrors a subset of states
+enum CancelTarget { CleanupReady, Cancelled }
+async fn cancel(&self, job_id: JobId, target: CancelTarget) -> Result<(), DbError>;
+```
+
+Only introduce an enum when there are three or more meaningful variants.
+
+# Binary Serialization
+
+For binary data stored in databases (e.g., job inputs/outputs, task payloads), use **msgpack**
+(`rmp-serde`) instead of JSON serialization. Reasons:
+
+* Msgpack produces compact binary output, which is more efficient for storage.
+* Rust's `String` enforces UTF-8 encoding, so serializing arbitrary bytes into a JSON string is
+  unsafe -- byte sequences that are not valid UTF-8 will be corrupted or rejected.
+
+When storing binary data in SQL databases, use binary column types (`VARBINARY`, `BLOB`, `LONGBLOB`)
+instead of text types (`VARCHAR`, `TEXT`, `LONGTEXT`).
+
+# Deferred APIs
+
+When an API's design depends on components not yet implemented (e.g., cache-layer interactions),
+mark it with `todo!("not implemented")` rather than providing a partial implementation that will
+need redesign:
+
+```rust
+async fn delete(&self, resource_group_id: ResourceGroupId) -> Result<(), DbError> {
+    todo!("not implemented -- requires cache-layer coordination")
+}
+```
+
 # Type-Level Validation
 
 Use newtype wrappers to enforce invariants at the type level rather than relying on runtime
@@ -301,6 +374,82 @@ behavior. Use real-time testing with appropriate timeouts instead.
 
 Implement trivial noop or mock state structs so that unit tests don't require external services
 (e.g., databases). Trait-based state abstractions enable this pattern.
+
+# SQL and Database Patterns
+
+## `let Some(..) = .. else` for optional row fetches
+
+Use `let Some(..) = ... else` for optional row fetches instead of match blocks:
+
+```rust
+// Good
+let Some((state, serialized_outputs)) = sqlx::query_as::<_, (JobState, Option<String>)>(QUERY)
+    .bind(job_id)
+    .fetch_optional(&self.pool)
+    .await?
+else {
+    return Err(DbError::JobNotFound(job_id));
+};
+
+// Bad: verbose match
+match sqlx::query_as(...).fetch_optional(...).await? {
+    Some((state, outputs)) => { ... }
+    None => return Err(DbError::JobNotFound(job_id)),
+}
+```
+
+## `.ok_or()` for single-value optional-to-result conversion
+
+```rust
+let state = sqlx::query_scalar::<_, JobState>(QUERY)
+    .bind(job_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(DbError::JobNotFound(job_id))?;
+```
+
+## `map_err` for error translation
+
+Use `.map_err(|e| match e { ... })` chains for translating database errors:
+
+```rust
+let job_id: JobId = sqlx::query_scalar(INSERT_QUERY)
+    .bind(resource_group_id)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::Database(e)
+            if e.try_downcast_ref::<MySqlDatabaseError>()
+                .is_some_and(|mysql_err| mysql_err.number() == MYSQL_ER_FK_CONSTRAINT) =>
+        {
+            DbError::ResourceGroupNotFound(resource_group_id)
+        }
+        e => e.into(),
+    })?;
+```
+
+## Avoid hardcoded state values
+
+Use enum bindings instead of hardcoded string/integer state values in SQL queries:
+
+```rust
+// Good: bind the enum value
+sqlx::query(QUERY).bind(JobState::Running)
+
+// Bad: hardcoded string
+sqlx::query("UPDATE jobs SET state = 'Running' WHERE ...")
+```
+
+## Placeholder batching for large IN clauses
+
+When building dynamic `IN (?, ?, ...)` clauses, consider placeholder limits and implement batching
+with bounded transaction scopes.
+
+## Constants scoping
+
+SQL query string constants that are used inside **only one method** should be defined as local
+constants inside that method, not at module level. Only promote to module-level when multiple methods
+share the constant.
 
 # Module Organization
 

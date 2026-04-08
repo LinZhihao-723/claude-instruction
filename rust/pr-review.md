@@ -1,10 +1,11 @@
 # Rust PR Review Skill
 
-When reviewing Rust PRs in the y-scope/clp repository (especially for `api-server`, `log-ingestor`, and
-`clp-rust-utils` components), apply the following review guidelines. These are derived from historical
-review patterns and project conventions.
+When reviewing Rust PRs in y-scope repositories (e.g., `y-scope/clp` for `api-server`, `log-ingestor`,
+`clp-rust-utils` components, and `y-scope/spider` for `spider-core`, `spider-storage` components),
+apply the following review guidelines. These are derived from historical review patterns and project
+conventions.
 
-Also refer to `rust_coding_style.md` for coding style requirements. This skill focuses on PR-level
+Also refer to `coding-style.md` for coding style requirements. This skill focuses on PR-level
 review patterns and conventions beyond the coding style.
 
 ## PR Title Convention
@@ -76,6 +77,19 @@ fn submit(ids: &[u64]) {
 fn submit(ids: Vec<u64>) {
     ...
 }
+```
+
+### Prefer references over `Arc`/`Vec` when ownership isn't needed
+
+For async trait methods that will not be run in detached coroutines, prefer `&T` and `&[T]` over
+`Arc<T>` and `Vec<T>`:
+
+```rust
+// Good: borrows are sufficient when not detaching
+async fn register(&self, task_graph: &TaskGraph, job_inputs: &[TaskInput]) -> Result<JobId, DbError>;
+
+// Bad: unnecessary ownership transfer
+async fn register(&self, task_graph: Arc<TaskGraph>, job_inputs: Vec<TaskInput>) -> Result<JobId, DbError>;
 ```
 
 ### Use `&str` for read-only string access
@@ -190,12 +204,19 @@ When identifying work that is out of scope for the current PR but should be trac
 1. **Cargo.toml**: Dependencies pinned to exact patch version? Alphabetically sorted? Unused
    dependencies removed?
 2. **Docstrings**: All public functions documented with the project's docstring format? `Returns`,
-   `Errors`, `Panics` sections present where applicable?
-3. **Error handling**: No `unwrap`? `expect` messages descriptive? Error types appropriate?
+   `Errors`, `Panics` sections present where applicable? Forwarded errors name the exact function?
+3. **Error handling**: No `unwrap`? `expect` messages descriptive? Error types appropriate? Dead
+   error variants removed?
 4. **Symbol ordering**: Public before private? `const` before `static` before normal?
-5. **Generic parameters**: Long descriptive names? Constraints in parameter position?
+5. **Generic parameters**: Long descriptive names (`Db` not `DB`)? Constraints in parameter position?
 6. **Config mirroring**: Python source documented? Defaults in sync?
 7. **OpenAPI**: API documentation updated if endpoints changed?
 8. **Breaking changes**: PR title marked with `!`? Migration path documented?
 9. **Naming**: Trait names as types (not suffixed)? Module-level name shortening where appropriate?
-10. **Efficiency**: Ownership passed where callee needs owned data? No unnecessary clones?
+10. **Efficiency**: Ownership passed where callee needs owned data? No unnecessary clones? References
+    preferred over `Arc`/`Vec` when ownership isn't needed?
+11. **Binary data**: Using msgpack for binary payloads? Binary column types in SQL schema?
+12. **Constants scoping**: SQL query constants local to methods that use them? Not unnecessarily
+    module-level?
+13. **Formatting**: Blank line before docstring blocks? Use `import` at function scope when the import
+    is local to one function?
