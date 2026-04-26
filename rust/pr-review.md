@@ -8,6 +8,18 @@ conventions.
 Also refer to `coding-style.md` for coding style requirements. This skill focuses on PR-level
 review patterns and conventions beyond the coding style.
 
+## Review Discipline
+
+Reviewers (including Claude) have repeatedly missed style violations that are clearly documented in
+`coding-style.md`. Before concluding any review, walk the diff line-by-line and verify the points
+in the "Common Review Checks" section below. Do not rely on the assumption that a high-level
+architecture pass will surface naming, ordering, or docstring problems -- it won't.
+
+If you find more than one or two violations of documented style rules, treat the PR as not yet
+ready to approve. Request a self-audit pass from the author rather than absorbing a long polish
+cycle into the review. Architecture-level design choices remain case-by-case judgment calls and
+should be discussed in PR comments, not enforced as blanket rules.
+
 ## PR Title Convention
 
 Suggest a PR title at the end of the review (typically at approval time) following this format:
@@ -46,6 +58,49 @@ If code in `api-server` or `log-ingestor` could be shared across components, sug
 * When a type is internal to a module, shorten its name (e.g., `SqsListenerTask` -> `Task` inside the
   module). Users reference it via the module path: `ingestion_job::SqsListener`.
 * Public symbols should be listed before private symbols within each `impl` block.
+* The `impl` block for a type must come **immediately after** the type definition, before any other
+  type's `impl` blocks. Don't define `struct A`, then `impl SomeTrait for B`, then come back to
+  `impl A`.
+
+### Naming consistency on rename
+
+When renaming a type, **rename every variable, field, parameter, message-variant field, and
+closure binding** named after the old type. Example: renaming `TaskInstanceRecord` ->
+`TaskInstanceMetadata` requires `record` -> `metadata` everywhere in the file (locals, struct
+fields, function parameters, helpers like `make_record` -> `make_task_instance_metadata`). A
+half-applied rename is worse than no rename.
+
+When the team has agreed on a domain term (e.g., "execution manager" instead of "worker"), apply
+the rename to the entire diff in this PR. "It would be a lot of edits" is not a valid reason to
+defer -- a wide mechanical rename is exactly the kind of change Claude can do in one pass.
+
+### Avoid weak identifiers
+
+* Don't include the data-structure type in identifiers. Use `dead_workers`, not `dead_worker_set`.
+  If you do mention "set", the underlying type must actually be a `HashSet` -- inconsistency
+  between the name and the type is a defect.
+* Avoid `Any_` prefix for type-erased enums; pick a concrete short name (e.g., `Tcb`) that conveys
+  what the value represents.
+
+### Generic type-parameter naming
+
+In addition to the `Db` (not `DB`) rule from `coding-style.md`:
+
+* Use the `XxxType` suffix to disambiguate type parameters from concrete types: `ReadyQueueSenderType`,
+  `LivenessStoreType`, `DbConnectorType`, not `ReadyQueue`/`LivenessStore`/`Db`. Without the suffix,
+  a reader can't tell at the call site whether `ReadyQueue` is a concrete type or a type parameter.
+* When renaming a type parameter, rename **all** uses including the surrounding `impl<...>` line. A
+  function and its enclosing `impl<>` must use the same names.
+
+### Trait surface minimization
+
+Don't expose methods on a connector or abstraction trait that the calling layer doesn't actually
+invoke. Each trait method is a contract that all implementations must satisfy and all reviewers
+must reason about. If only an internal helper or background coroutine needs a method, keep it on
+the implementation type, not the trait.
+
+Watch for trait methods that exist only to support tests or one internal helper -- those are signs
+the abstraction is wrong.
 
 ### Enum dispatch vs dynamic dispatch
 
@@ -78,6 +133,12 @@ fn submit(ids: Vec<u64>) {
     ...
 }
 ```
+
+### Conversely: don't take ownership when a reference suffices
+
+If a helper only reads from its argument and the caller still needs the value, take `&T` instead of
+`T`. Watch for unnecessary `T` parameters in helpers called from a loop where the caller's
+iteration variable is reused.
 
 ### Prefer references over `Arc`/`Vec` when ownership isn't needed
 
@@ -142,10 +203,102 @@ When Rust types mirror existing Python definitions:
 * Use typed error enums for library-level code where callers may need to match on specific error
   variants.
 
+### Don't silently swallow errors
+
+If a fallible call returns `Err`, don't pattern-match-and-ignore it on the success path:
+
+```rust
+// Bad: error vanishes; caller has no chance to react.
+let alive = match store.is_alive(id).await {
+    Ok(alive) => alive,
+    Err(_) => return true,
+};
+
+// Good: bubble up.
+let alive = store.is_alive(id).await?;
+```
+
+The same applies to `let _ = fallible().await;` -- replace with `?` or an explicit handling
+comment that justifies the discard.
+
 ### Prefix error context with lowercase, no trailing period
 
 Use `context("cannot load config file ...")` with lowercase start, no period -- consistent with the
-error message conventions in `rust_coding_style.md`.
+error message conventions in `coding-style.md`.
+
+## Docstring Audit
+
+Beyond the templates in `coding-style.md`, watch for these recurring defects:
+
+### Visibility does not exempt a function from a docstring
+
+**Both public and non-public** functions need docstrings following the `coding-style.md` template.
+Private and `pub(crate)` helpers are not exempt. The only legitimate exemptions are:
+
+1. The function is simple enough (e.g., a one-line getter or setter).
+2. The function is a trait implementation whose trait declaration already documents it.
+3. The item is a private *struct field* (data, not a function).
+
+If a private helper needs a paragraph of inline reasoning, that paragraph belongs in a docstring,
+not inside the function body.
+
+### Boolean `Returns` wording
+
+Use **"Whether ... on success."** rather than `true if ... false otherwise`:
+
+```rust
+// Good
+/// # Returns
+///
+/// Whether the execution manager is alive on success.
+
+// Bad
+/// # Returns
+///
+/// `true` if the execution manager is alive, `false` otherwise, on success.
+```
+
+This matches the convention used by C++/Python docstrings in y-scope projects.
+
+### `# Parameters` only in trait declarations
+
+Don't add a `# Parameters` section to regular functions or trait implementations. Parameter names
+and types in the signature are self-documenting. Trait *declarations* are the exception (the trait
+contract documents the parameter semantics).
+
+### `# Type Parameters` is required when type parameters exist
+
+Any function with type parameters must have a `# Type Parameters` section listing each one. Easy to
+forget after refactoring a function from `pub fn new(...)` to `pub fn create<T1, T2>(...)`.
+
+### `Forwards [\`func\`]` must name the exact function
+
+* The named function must be the actual call site reached via `?`, not a generic placeholder
+  ("the relevant job-state guard errors", "sqlx errors").
+* Don't use `Forwards [\`Error::Variant\`]` for errors this function constructs and returns
+  directly. Use `* [\`Error::Variant\`] if <condition>.` for direct errors; reserve `Forwards` for
+  errors propagated via `?`.
+* When a function is refactored to delegate to helpers, rewrite `# Errors` to forward each helper
+  (e.g., `Forwards [\`Self::create_regular_task_instance\`]'s return values on failure.`) instead
+  of re-listing every leaf error.
+* Watch for placeholder names left over from a refactor (e.g., `Self::run_gc_cycle_at_claude_version`
+  when the function is `run_gc_cycle_at`). These are signs of incomplete cleanup.
+
+### Stale docstring sections
+
+When code is refactored, the corresponding `# Returns`, `# Errors`, and prose blocks must be
+updated. Common stale patterns:
+
+* `# Errors` listing errors from a code path that was deleted.
+* Bullets referencing methods that were removed.
+* Sentence fragments left from a partial edit (missing blank line before `# Errors`, unterminated
+  bullet).
+
+### Drop redundant in-test narration
+
+Comments like `// First registration should succeed via the verify call.` immediately above a line
+that does exactly that are noise -- the test name and assertion already say it. Keep comments only
+when they explain *why* (e.g., a corner case the code is intentionally tolerating).
 
 ## Testing Conventions
 
@@ -164,6 +317,24 @@ async fn test_something() -> anyhow::Result<()> {
 }
 ```
 
+### Cover all basic behaviors of stand-alone components
+
+For a new stand-alone component (pool, actor, scheduler, etc.), don't ship with tests that only
+exercise the most prominent method. Identify the component's basic behaviors -- registration,
+background-loop cycles, recovery paths, terminal cleanup -- and cover each one.
+
+If you can't probe the internal state needed to assert these behaviors, that itself is a signal the
+component needs a test-only accessor or a different architecture; raise it in review rather than
+shipping with thin coverage.
+
+### Don't sprawl into unrelated test infra
+
+If the new component compiles into the same crate as existing tests (e.g.,
+`tests/scheduling_infra.rs`), leave that infra alone unless it actually exercises the new
+component. Adding a noop implementation of the new trait there just to satisfy the compiler is a
+sign the new component shouldn't be a hard dependency of that path. Push back on PRs that
+restructure unrelated test scaffolding.
+
 ### Prefer real-time testing for complex async code
 
 Avoid `tokio::time::pause()` when behavior involves `select!` in long-running loops, as time
@@ -180,9 +351,19 @@ services (e.g., databases). Trait-based state abstractions enable this.
 ### Review phases
 
 1. **First pass**: Review for correctness, architecture, and design decisions.
-2. **Changes requested**: List specific items to fix. Use GitHub suggestion blocks for small fixes.
-3. **Follow-up reviews**: Verify requested changes are addressed.
-4. **Approval**: Suggest a final PR title. Verify the PR can be merged.
+2. **Style sweep**: Walk the diff with `coding-style.md` open. Flag every naming, ordering, and
+   docstring issue at once -- not in a drip across multiple rounds.
+3. **Changes requested**: List specific items to fix. Use GitHub suggestion blocks for small fixes.
+4. **Follow-up reviews**: Verify requested changes are addressed.
+5. **Approval**: Suggest a final PR title. Verify the PR can be merged.
+
+### When the polish burden is too high
+
+If addressing review feedback would take the reviewer more time than re-doing the change themselves,
+that's a signal the PR was not ready for review. Reviewers in y-scope have explicitly flagged this
+pattern: a PR should not require the reviewer to push commits like "Polish.", "Further polishing
+X.", "Last few fixes." to land. When you (Claude) are the author, run a self-audit pass against
+`coding-style.md` before requesting review.
 
 ### Requesting follow-up work
 
@@ -203,20 +384,38 @@ When identifying work that is out of scope for the current PR but should be trac
 
 1. **Cargo.toml**: Dependencies pinned to exact patch version? Alphabetically sorted? Unused
    dependencies removed?
-2. **Docstrings**: All public functions documented with the project's docstring format? `Returns`,
-   `Errors`, `Panics` sections present where applicable? Forwarded errors name the exact function?
-3. **Error handling**: No `unwrap`? `expect` messages descriptive? Error types appropriate? Dead
-   error variants removed?
-4. **Symbol ordering**: Public before private? `const` before `static` before normal?
-5. **Generic parameters**: Long descriptive names (`Db` not `DB`)? Constraints in parameter position?
-6. **Config mirroring**: Python source documented? Defaults in sync?
-7. **OpenAPI**: API documentation updated if endpoints changed?
-8. **Breaking changes**: PR title marked with `!`? Migration path documented?
-9. **Naming**: Trait names as types (not suffixed)? Module-level name shortening where appropriate?
-10. **Efficiency**: Ownership passed where callee needs owned data? No unnecessary clones? References
-    preferred over `Arc`/`Vec` when ownership isn't needed?
-11. **Binary data**: Using msgpack for binary payloads? Binary column types in SQL schema?
-12. **Constants scoping**: SQL query constants local to methods that use them? Not unnecessarily
+2. **Docstrings**:
+   * **Every function -- public AND non-public** -- documented per `coding-style.md` (unless one of
+     the three explicit exemptions applies)?
+   * `Returns`, `Errors`, `Panics` sections present where applicable?
+   * Boolean returns worded as "Whether ... on success."?
+   * No `# Parameters` outside trait declarations?
+   * `# Type Parameters` present whenever type parameters exist?
+   * `Forwards [\`func\`]` names the exact function (not generic prose); not used for direct errors?
+   * No stale references to deleted methods or placeholder names?
+   * Blank line before every `///` block?
+3. **Error handling**: No `unwrap`? `expect` messages descriptive? No silently-swallowed `Err` arms?
+   No bare `let _ = fallible().await`? Error types appropriate? Dead error variants removed?
+4. **Symbol ordering**: Public before private? `const` before `static` before normal? Type's own
+   `impl` block immediately follows the type definition?
+5. **Generic parameters**: `XxxType` suffix? Long descriptive names (`Db` not `DB`)? Constraints
+   inline (no `where` clause)? Names consistent between the function signature and its surrounding
+   `impl<...>`?
+6. **Naming consistency**: When a type was renamed in this PR, are all variables/fields/parameters
+   named after the old type also renamed? No `Any_` prefix on type-erased enums? No
+   data-structure-type words in identifiers (`dead_workers`, not `dead_worker_set`)?
+7. **Trait surface**: Each trait method actually invoked by the consuming layer? No methods exposed
+   only for internal helpers?
+8. **Config mirroring**: Python source documented? Defaults in sync?
+9. **OpenAPI**: API documentation updated if endpoints changed?
+10. **Breaking changes**: PR title marked with `!`? Migration path documented?
+11. **Efficiency**: Ownership passed where callee needs owned data? No unnecessary clones?
+    References preferred over `Arc`/`Vec` when ownership isn't needed? Reference taken when caller
+    still needs the value?
+12. **Binary data**: Using msgpack for binary payloads? Binary column types in SQL schema?
+13. **Constants scoping**: SQL query constants local to methods that use them? Not unnecessarily
     module-level?
-13. **Formatting**: Blank line before docstring blocks? Use `import` at function scope when the import
-    is local to one function?
+14. **Test coverage**: Stand-alone components covered for all basic behaviors, not just the happy
+    path? Unrelated test infra left alone?
+15. **Formatting**: Blank line before docstring blocks? Use `import` at function scope when the
+    import is local to one function?
