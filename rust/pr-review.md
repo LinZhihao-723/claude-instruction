@@ -242,6 +242,43 @@ Private and `pub(crate)` helpers are not exempt. The only legitimate exemptions 
 If a private helper needs a paragraph of inline reasoning, that paragraph belongs in a docstring,
 not inside the function body.
 
+### Short description is optional; `# Returns` is not
+
+For short / simple functions, the one-line description **can** be dropped — but the `# Returns`
+section must stay (per `coding-style.md`, `# Returns` may be omitted only when the function
+returns `()` or `Result<()>`).
+
+Valid (preferred for a trivial getter):
+
+```rust
+/// # Returns
+///
+/// The current session ID.
+fn session_id(&self) -> u64;
+```
+
+Also valid (description and `# Returns`):
+
+```rust
+/// Returns the current session ID.
+///
+/// # Returns
+///
+/// The current session ID.
+fn session_id(&self) -> u64;
+```
+
+**Not** preferred — drops the structured `# Returns` for a non-`()` return:
+
+```rust
+/// Returns the current session ID.
+fn session_id(&self) -> u64;
+```
+
+When auditing, do **not** flag a docstring that has only `# Returns` (no description). Conversely,
+do flag a one-line description that omits `# Returns` for a function returning a non-trivial
+value.
+
 ### Boolean `Returns` wording
 
 Use **"Whether ... on success."** rather than `true if ... false otherwise`:
@@ -387,7 +424,9 @@ When identifying work that is out of scope for the current PR but should be trac
 2. **Docstrings**:
    * **Every function -- public AND non-public** -- documented per `coding-style.md` (unless one of
      the three explicit exemptions applies)?
-   * `Returns`, `Errors`, `Panics` sections present where applicable?
+   * `# Returns` present for any non-`()` / non-`Result<()>` return? (Short description may be
+     omitted for trivial functions, but `# Returns` should remain.)
+   * `Errors`, `Panics` sections present where applicable?
    * Boolean returns worded as "Whether ... on success."?
    * No `# Parameters` outside trait declarations?
    * `# Type Parameters` present whenever type parameters exist?
