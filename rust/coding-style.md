@@ -28,6 +28,21 @@ let result = some_function().expect("this is the error");
 
 # Docstrings
 
+The purpose of the docstring is to give a high-level explanation of what the code does (driven by
+inputs/outputs). It is not designed to explain the details of the code. For example, the mod level
+docstring should not go into details about the symbols inside the mod; similarly, the function
+docstrings should not include implementation details.
+
+On exceptions, the docstrings may include important implementation details to the users. This is a
+case-by-case decision and should be carefully reviewed. By default, please assume all docstrings are
+high-level.
+
+## Mod level docstrings
+
+Each mod should have a high-level description docstring on the top.
+
+## Symbol level docstrings
+
 You should add docstrings for every function with the following format:
 
 ```
@@ -374,6 +389,33 @@ behavior. Use real-time testing with appropriate timeouts instead.
 
 Implement trivial noop or mock state structs so that unit tests don't require external services
 (e.g., databases). Trait-based state abstractions enable this pattern.
+
+## Assertions
+
+If you ever have asserts like:
+
+```rust
+assert_eq!(slice.len(), 0);
+assert!(slice.is_empty());
+assert!(option.is_none());
+```
+
+You should rewrite them like:
+
+```rust
+assert_eq!(slice, &[]);
+assert_eq!(option, None);
+```
+
+So if they fail, the assert message tells you what it is. On the other hand, you can but there's not
+much benefit to rewrite:
+
+```rust
+assert!(!slice.is_empty());
+assert!(option.is_some());
+```
+
+Since if they fail, they're just `&[]` and `None`.
 
 # SQL and Database Patterns
 
