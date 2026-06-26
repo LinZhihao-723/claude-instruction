@@ -180,6 +180,27 @@ Note: Inside each `impl` block, public functions should be listed before private
 * In a log message (e.g., in `tracing`), the error message should start with a capitalized letter,
   and end with a period.
 
+# Log field formatting
+
+In `tracing` macros, the `?` (Debug) and `%` (Display) sigils are separated from the value they
+apply to by a single space:
+
+```rust
+// Good
+tracing::warn!(
+    em_id = ? em_id,
+    error = % error,
+    "Failed to notify scheduler shutdown."
+);
+
+// Bad: no space between the sigil and the value
+tracing::warn!(
+    em_id = ?em_id,
+    error = %error,
+    "Failed to notify scheduler shutdown."
+);
+```
+
 # Naming
 
 ## Trait names
