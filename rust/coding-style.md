@@ -158,6 +158,12 @@ Additional docstring rules:
 * When error variants are removed or code paths that produce certain errors are deleted, **remove the
   dead error enum variants** as well.
 
+# Comments
+
+Do not add visual guide / section-header comments in code, for example
+`// -- A minimal hand-written Task impl --`. Comments should explain *why* the code does something,
+not act as visual dividers or restate what the code structure already makes clear.
+
 # Symbol ordering
 
 We should use the following symbol ordering rules:
