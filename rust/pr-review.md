@@ -417,6 +417,45 @@ When identifying work that is out of scope for the current PR but should be trac
 * However, flag any issues that could cause problems if left unaddressed (e.g., missing validation
   that could cause runtime failures).
 
+## When to add/update docstrings/comments and when not to
+
+For any code changes, it is important to check when to add/update docstrings/comments and when not
+to. The following are some guidelines:
+- If the code changes update the existing docstring/comments, you should update them. Examples:
+  - Update a type name.
+  - Update a function's implementation with larger big-O complexity which was documented in the
+    docstring.
+- If the code changes add a new feature, you **SHOULD NOT** add additional docstrings/comments to
+  explain the specific behavior of the new feature, unless explicitly asked for. For example, the
+  following code added some new features for env var passing. However, the comments are useless
+  and they should be omitted unless explicitly asked for.
+  ```rust
+  // Always forward `RUST_LOG` so the executor's log verbosity matches ours. It is commonly
+  // unset, so a missing value is silently ignored rather than warned about.
+  if let Ok(rust_log) = std::env::var("RUST_LOG") {
+      command.env("RUST_LOG", rust_log);
+  }
+
+  // Additionally forward the user-configured env keys. Unlike `RUST_LOG` these are explicitly
+  // requested, so a value that is unset (or non-Unicode) is surfaced as a warning.
+  for key in &self.config.env_keys {
+      match std::env::var(key) {
+          Ok(value) => {
+              command.env(key, value);
+          }
+          Err(e) => {
+              tracing::warn!(
+                  executor_id,
+                  env_key = % key,
+                  err = % e,
+                  "Configured env key could not be read from the execution manager's \
+                   environment; skipping."
+              );
+          }
+      }
+  }
+  ```
+
 ## Common Review Checks
 
 1. **Cargo.toml**: Dependencies pinned to exact patch version? Alphabetically sorted? Unused
