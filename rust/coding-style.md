@@ -225,6 +225,36 @@ We use long descriptive names for generic type parameters, instead of single let
   * We prefer to put type constraints in the type parameter, for example, `CacheType: Cache` instead
     of `CacheType` with a `where CacheType: Cache` clause.
 
+## Rename a function once its behaviour narrows
+
+When a function stops branching -- a get-or-create that becomes a create, a fallible call that
+becomes infallible -- the old name describes behaviour it no longer has. Rename it to state the
+single thing it now does, for example `activate_group` -> `create_and_activate_group`.
+
+# API design
+
+* A function whose first parameter is `&T` or `&mut T` belongs on `T` as a method. A free function
+  taking a type as its first argument is a method written in the wrong place.
+* Constructors are associated functions on the type they construct, including variant constructors:
+  `Fixture::new_special()` rather than a free `new_special_fixture()`.
+* Do not take a parameter that can be derived from state the receiver already holds. A count, a
+  length, or an index range the callee can read for itself is an argument that can disagree with
+  reality.
+* Use named fields over positional tuples for state that carries meaning, and return keyed
+  collections rather than positional ones. A tuple, or a `Vec` indexed by position, encodes
+  assumptions -- ordering, density, known length -- that the surrounding code does not guarantee,
+  and forces every call site to remember what each position means. Prefer
+  `HashMap<ResourceGroupId, usize>` over a `Vec<usize>` whose index is implicitly a resource group.
+
+## Assert preconditions instead of tolerating them
+
+A branch that quietly handles a state the caller should never produce hides misuse. Replace it with
+an assertion so that the misuse is loud.
+
+Check every call site before doing so: a tolerated branch is sometimes load-bearing somewhere else,
+and finding out which is the point of the exercise. If the branch is dead everywhere, the assertion
+documents an invariant; if it is live, the tolerance was the feature.
+
 # Dependencies
 
 Dependencies are specified inside `Cargo.toml` with the requirements:
@@ -412,6 +442,33 @@ Avoid `tokio::time::pause()` when the implementation uses `select!` in long-runn
 simulation only guarantees ordering for `sleep` calls and does not reliably control `select!`
 behavior. Use real-time testing with appropriate timeouts instead.
 
+## Panic in test helpers when the failure means the test is wrong
+
+A test *function* returns `anyhow::Result`. A test *helper* should panic when the failure it hits
+can only mean the test is misusing it -- registering the same entity twice, seeding a fixture that
+is already seeded. Those are authoring bugs, not outcomes under test, and returning `Result` for
+them spreads `?` across every call site for an error no test should ever handle.
+
+Reserve `Result` in a helper for a failure that is a legitimate outcome of what is being tested.
+
+## Test data and configuration
+
+* A struct-shaped input is one base constant plus per-test overrides, not a set of constants and a
+  factory function:
+
+  ```rust
+  const BASE_CONFIG: Config = Config { /* every field */ };
+
+  let config = Config { dispatch_queue_capacity: nonzero(256), ..BASE_CONFIG };
+  ```
+
+  Call sites then name the field they vary instead of passing positional arguments, and adding a
+  field touches one line rather than every factory signature and its callers.
+* Scope a constant to the narrowest place that uses it. A constant read by a single test moves into
+  that test rather than sitting at module level.
+* Derive an expectation from the same constant that configured the input, for example
+  `BASE_CONFIG.ready_task_capacity.get() - num_buffered`, so that the two cannot drift apart.
+
 ## Use mock/noop states for unit tests
 
 Implement trivial noop or mock state structs so that unit tests don't require external services
@@ -443,6 +500,27 @@ assert!(option.is_some());
 ```
 
 Since if they fail, they're just `&[]` and `None`.
+
+# Coding-agent driven test case writing
+
+A coding agent can produce a large, green test suite that demonstrates very little. These rules are
+about proving that a test does what it claims.
+
+* **Passing tests are not coverage.** Before claiming a behaviour is covered, break it deliberately
+  -- delete the guard, invert the condition, drop the bookkeeping -- and re-run. If nothing fails,
+  the behaviour is untested no matter how many tests exist. Do this for the behaviours a change is
+  actually about, and report the result rather than the test count.
+* **Validate a new test against the specific defect it exists to catch.** Apply that defect, confirm
+  *that* test fails, then revert it and confirm the suite passes. A test can pass with the bug
+  applied when a second layer of defence masks it, and such a test is indistinguishable from a real
+  one until you check.
+* **Prefer driving the real entry point.** A helper that seeds internal state skips the code the
+  test was meant to exercise. Some tests need that shortcut to stay readable, but know how many of
+  yours take it: a suite where most tests write state directly covers far less than its size
+  suggests.
+* **Do not test what the type system or the protocol makes unreachable.** Such a test pins an
+  exhaustiveness arm rather than a behaviour, and misleads the next reader into thinking the case
+  can occur. If the case is genuinely impossible, say so where the arm is written instead.
 
 # SQL and Database Patterns
 
