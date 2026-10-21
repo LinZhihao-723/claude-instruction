@@ -339,6 +339,12 @@ when they explain *why* (e.g., a corner case the code is intentionally toleratin
 
 ## Testing Conventions
 
+### Test names describe the coverage
+
+Flag a test name with a `test_` prefix. The name should be a natural description of what the test
+covers -- the subject, the scenario, and the expected outcome -- e.g.
+`cancel_job_returns_job_not_found_if_not_exist`, not `test_cancel_job_not_found`.
+
 ### No `unwrap` in tests
 
 Use `expect("descriptive message")` even in test code.
@@ -347,7 +353,7 @@ Use `expect("descriptive message")` even in test code.
 
 ```rust
 #[tokio::test]
-async fn test_something() -> anyhow::Result<()> {
+async fn do_something_returns_expected_value() -> anyhow::Result<()> {
     let result = do_something().await?;
     assert_eq!(result, expected);
     Ok(())
@@ -481,7 +487,8 @@ to. The following are some guidelines:
    `impl<...>`?
 6. **Naming consistency**: When a type was renamed in this PR, are all variables/fields/parameters
    named after the old type also renamed? No `Any_` prefix on type-erased enums? No
-   data-structure-type words in identifiers (`dead_workers`, not `dead_worker_set`)?
+   data-structure-type words in identifiers (`dead_workers`, not `dead_worker_set`)? Test names
+   describe the coverage, with no `test_` prefix?
 7. **Trait surface**: Each trait method actually invoked by the consuming layer? No methods exposed
    only for internal helpers?
 8. **Config mirroring**: Python source documented? Defaults in sync?

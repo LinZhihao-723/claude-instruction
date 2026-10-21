@@ -421,6 +421,15 @@ pub struct SomeConfig {
 
 # Testing
 
+## Test names
+
+Don't prefix a test name with `test_`: the `#[test]` attribute already marks it as a test. Name it
+with a natural description of what it covers -- the subject, the scenario, and the expected outcome:
+
+* `cancel_job_returns_job_not_found_if_not_exist`
+* `concurrent_advance_converges_to_max`
+* `invalid_zstd_bytes_are_rejected`
+
 ## No `unwrap` in tests
 
 Use `expect("descriptive message")` even in test code. This rule applies everywhere, including tests.
@@ -429,7 +438,7 @@ Use `expect("descriptive message")` even in test code. This rule applies everywh
 
 ```rust
 #[tokio::test]
-async fn test_something() -> anyhow::Result<()> {
+async fn do_something_returns_expected_value() -> anyhow::Result<()> {
     let result = do_something().await?;
     assert_eq!(result, expected);
     Ok(())
