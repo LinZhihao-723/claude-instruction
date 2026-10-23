@@ -421,6 +421,42 @@ pub struct SomeConfig {
 
 # Testing
 
+## What deserves a unit test
+
+Test the logic the code owns, not behavior that the compiler, `serde`, or a third-party library
+already guarantees.
+
+* **Don't test derived or declarative behavior.** A test that only re-checks what a derive or an
+  attribute declares adds no coverage and just repeats the literal from the code. For example:
+  * field names and round-trips of a `#[derive(Serialize, Deserialize)]` type;
+  * `#[serde(rename = ...)]` / `#[serde(tag = ...)]` strings, and an unknown tag being rejected;
+  * a required field being rejected when it's missing;
+  * `skip_serializing_if`, `default`, and similar attributes doing what serde documents.
+
+  If an attribute exists for a non-obvious reason (e.g., an external consumer rejects `null`),
+  explain it with a short *why* comment on the attribute instead of a test.
+* **Don't test third-party behavior.** For example, don't test that the AWS SDK's profile provider
+  reads a credentials file. Test only the decision the code makes before handing off to the
+  library.
+* **Do test hand-written logic:** validation rules, hand-written conversions (`From`/`TryFrom`
+  impls that map fields), selection logic (which `match` arm produces what), and hand-written serde
+  behavior (`try_from`/`with` adapters, custom `Deserialize` impls).
+* **Test a behavior once, where it's defined.** If a type owns a custom behavior (e.g., a newtype
+  that validates on deserialization, or a generic `#[serde(with = ...)]` adapter), its tests live
+  in that type's module. Don't repeat them for every struct that embeds the type.
+* **Don't add test-only seams to production code.** Don't add parameters or private `*_with_config`
+  variants that exist only so a test can inject state. If a behavior can't be tested without one,
+  inline the code and accept the coverage gap, or test through the real entry point.
+* **Keep tests that guard wiring the change touched,** when they drive the real entry point without
+  external services (e.g., a client constructor that must install a credentials provider). These
+  are the exception, not the default.
+* **Remove redundant assertions.** If one test already covers a case, don't assert it again in
+  another.
+
+Every test that passes these criteria must still satisfy the
+[Coding-agent driven test case writing](#coding-agent-driven-test-case-writing) rules: it must fail
+when the behavior it covers is deliberately broken.
+
 ## Test names
 
 Don't prefix a test name with `test_`: the `#[test]` attribute already marks it as a test. Name it
