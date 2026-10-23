@@ -370,6 +370,27 @@ If you can't probe the internal state needed to assert these behaviors, that its
 component needs a test-only accessor or a different architecture; raise it in review rather than
 shipping with thin coverage.
 
+### Flag tests that don't test the code's own logic
+
+Apply `coding-style.md` § What deserves a unit test to every test the PR adds. Ask for removal of
+tests that:
+
+* only re-check derived or declarative behavior: `serde` field names and round-trips,
+  `rename`/`tag` strings, unknown-tag or missing-field rejection, or what an attribute such as
+  `skip_serializing_if` already documents;
+* exercise a third-party library rather than the decision the code makes before calling it;
+* repeat a type's custom behavior (e.g., a newtype's validation on deserialization) for every
+  struct that embeds the type, instead of testing it once in the type's own module;
+* assert a case that another test already covers.
+
+When a removed test was the only explanation for a non-obvious attribute or choice, ask for a short
+*why* comment in its place.
+
+Also flag test-only seams in production code: extra parameters or private `*_with_config` variants
+that exist only so a test can inject state. Ask for the code to be inlined, or for the behavior to
+be tested through the real entry point. This doesn't cover the test-only accessor discussed above,
+which is a design question to raise in review.
+
 ### Don't sprawl into unrelated test infra
 
 If the new component compiles into the same crate as existing tests (e.g.,
@@ -501,6 +522,8 @@ to. The following are some guidelines:
 13. **Constants scoping**: SQL query constants local to methods that use them? Not unnecessarily
     module-level?
 14. **Test coverage**: Stand-alone components covered for all basic behaviors, not just the happy
-    path? Unrelated test infra left alone?
+    path? Unrelated test infra left alone? Does every new test cover the code's own logic, rather
+    than derived, `serde`, or third-party behavior? Is each behavior tested once, in the module that
+    defines it, without test-only seams in production code?
 15. **Formatting**: Blank line before docstring blocks? Use `import` at function scope when the
     import is local to one function?
