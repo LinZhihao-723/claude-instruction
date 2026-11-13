@@ -262,8 +262,17 @@ single thing it now does, for example `activate_group` -> `create_and_activate_g
   and forces every call site to remember what each position means. Prefer
   `HashMap<ResourceGroupId, usize>` over a `Vec<usize>` whose index is implicitly a resource group.
 * Don't define tuple structs, including single-field newtypes. Give every field a name, after its
-  type: `struct ValidatedCompressedJobSubmission { compressed_job_submission:
-  CompressedJobSubmission }`, not `struct ValidatedCompressedJobSubmission(CompressedJobSubmission)`.
+  type:
+
+  ```rust
+  // Good
+  pub struct ValidatedCompressedJobSubmission {
+      compressed_job_submission: CompressedJobSubmission,
+  }
+
+  // Bad: tuple struct
+  pub struct ValidatedCompressedJobSubmission(CompressedJobSubmission);
+  ```
 
 ## Assert preconditions instead of tolerating them
 

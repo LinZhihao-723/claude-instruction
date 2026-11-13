@@ -540,5 +540,5 @@ to. The following are some guidelines:
     defines it, without test-only seams in production code?
 15. **Formatting**: Blank line before docstring blocks? Use `import` at function scope when the
     import is local to one function?
-16. **Struct shape**: No tuple structs, including single-field newtypes? Every field named, after its
-    type?
+16. **Struct shape**: No tuple structs, including single-field newtypes? Every field named after
+    its type?
