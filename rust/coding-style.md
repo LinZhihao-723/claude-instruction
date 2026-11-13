@@ -160,6 +160,19 @@ Additional docstring rules:
 * Document in `# Panics` only the panics that the function itself raises, e.g., with an `expect`,
   `panic!`, or `assert!` in its own body. Don't document a panic that only a callee may raise:
   unlike errors, panics aren't forwarded, so never write `Panics if [`func`] panics.`
+* Document a tuple return value as a bulleted list of its elements, in order, not as a
+  `(name, name)` pattern:
+
+  ```rust
+  /// # Returns
+  ///
+  /// A tuple containing:
+  ///
+  /// * The task graph.
+  /// * The job inputs.
+  /// * The compressed serializations.
+  pub fn into_parts(self) -> (TaskGraph, TaskGraphInput, ValidatedCompressedJobSubmission)
+  ```
 
 # Comments
 
@@ -248,6 +261,9 @@ single thing it now does, for example `activate_group` -> `create_and_activate_g
   assumptions -- ordering, density, known length -- that the surrounding code does not guarantee,
   and forces every call site to remember what each position means. Prefer
   `HashMap<ResourceGroupId, usize>` over a `Vec<usize>` whose index is implicitly a resource group.
+* Don't define tuple structs, including single-field newtypes. Give every field a name, after its
+  type: `struct ValidatedCompressedJobSubmission { compressed_job_submission:
+  CompressedJobSubmission }`, not `struct ValidatedCompressedJobSubmission(CompressedJobSubmission)`.
 
 ## Assert preconditions instead of tolerating them
 

@@ -504,6 +504,8 @@ to. The following are some guidelines:
    * `Errors`, `Panics` sections present where applicable?
    * `# Panics` lists only the function's own panics, never a callee's (no
      `Panics if [\`func\`] panics.`)?
+   * Tuple returns documented as "A tuple containing:" followed by one bullet per element, not as
+     a `(name, name)` pattern?
    * Boolean returns worded as "Whether ... on success."?
    * No `# Parameters` outside trait declarations?
    * `# Type Parameters` present whenever type parameters exist?
@@ -538,3 +540,5 @@ to. The following are some guidelines:
     defines it, without test-only seams in production code?
 15. **Formatting**: Blank line before docstring blocks? Use `import` at function scope when the
     import is local to one function?
+16. **Struct shape**: No tuple structs, including single-field newtypes? Every field named, after its
+    type?
