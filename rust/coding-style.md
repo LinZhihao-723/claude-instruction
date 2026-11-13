@@ -309,6 +309,41 @@ fn submit(ids: Vec<u64>) {
 }
 ```
 
+## Take ownership when the value mustn't be used afterwards
+
+If calling a method ends the value's useful life -- it finishes, commits, cancels, disarms, sends or
+converts the value -- take `self` by value instead of `&mut self`. The compiler then rejects any use
+afterwards, including a second call, so the method doesn't need a runtime check or a flag for "has
+this already happened?", and its docs don't need to say "only call this once".
+
+```rust
+// Bad: `&mut self` lets the caller disarm and then request, or request twice, so the type has to
+// track and tolerate it at run time.
+impl CancellationGuard {
+    fn disarm(&mut self) { ... }
+    fn request(&mut self) { ... }
+}
+
+// Good: each consumes the guard; a second call doesn't compile.
+impl CancellationGuard {
+    fn disarm(mut self) { ... }
+    async fn cancel(mut self) { ... }
+}
+```
+
+* **Keep the state the `Drop` impl needs in an `Option`**, and `take()` it in the consuming method.
+  Rust doesn't let you move a field out of a type that implements `Drop`, and the `Drop` impl still
+  runs when the consuming method returns, so it must find nothing left to do. The `Option` is an
+  implementation detail: it never appears in the type's API.
+* **Don't use `std::mem::forget(self)` to skip `Drop`.** It leaks every field, including the `Arc`s,
+  connections and futures they own. Use it only for a value that owns nothing, and prefer the
+  `Option` even then. `ManuallyDrop` needs `unsafe` to get the field out; don't reach for it to
+  avoid an `Option`.
+* **Prefer an `async fn` taking `self` to spawning from a `&mut self` method** when the caller is
+  already async: await the work directly, and keep spawning for `Drop`, which can't await.
+* **The same applies to builders and handles** whose terminal method (`build`, `finish`, `commit`,
+  `into_*`) leaves nothing useful behind.
+
 ## Use `&str` for read-only string access
 
 When a function only needs to read a string value (e.g., checking prefixes, logging), accept `&str`

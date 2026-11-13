@@ -134,6 +134,15 @@ fn submit(ids: Vec<u64>) {
 }
 ```
 
+### Consume `self` when the value mustn't be used afterwards
+
+Flag a `&mut self` method after which the value is dead -- it finishes, commits, cancels, disarms,
+or sends it -- especially one guarded by an "already done" flag, an `Option` checked at the start,
+or a docstring saying "call at most once". Ask for it to take `self` instead, so the compiler
+enforces it. If the type implements `Drop`, the state `Drop` needs stays in an `Option` that the
+consuming method takes. Flag `std::mem::forget(self)` used to skip `Drop`: it leaks whatever the
+value owns.
+
 ### Conversely: don't take ownership when a reference suffices
 
 If a helper only reads from its argument and the caller still needs the value, take `&T` instead of
