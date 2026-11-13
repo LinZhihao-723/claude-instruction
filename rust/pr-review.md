@@ -502,6 +502,8 @@ to. The following are some guidelines:
    * `# Returns` present for any non-`()` / non-`Result<()>` return? (Short description may be
      omitted for trivial functions, but `# Returns` should remain.)
    * `Errors`, `Panics` sections present where applicable?
+   * `# Panics` lists only the function's own panics, never a callee's (no
+     `Panics if [\`func\`] panics.`)?
    * Boolean returns worded as "Whether ... on success."?
    * No `# Parameters` outside trait declarations?
    * `# Type Parameters` present whenever type parameters exist?

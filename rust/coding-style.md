@@ -157,6 +157,9 @@ Additional docstring rules:
   `Forwards sqlx error`. Be careful to use the correct function name.
 * When error variants are removed or code paths that produce certain errors are deleted, **remove the
   dead error enum variants** as well.
+* Document in `# Panics` only the panics that the function itself raises, e.g., with an `expect`,
+  `panic!`, or `assert!` in its own body. Don't document a panic that only a callee may raise:
+  unlike errors, panics aren't forwarded, so never write `Panics if [`func`] panics.`
 
 # Comments
 
