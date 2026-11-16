@@ -6,9 +6,12 @@ of CLP. It is the companion of `coding-style.md`, which covers how code should l
 use types, traits, errors, ownership, async and crate boundaries so that whole classes of bugs can't
 be written, and the rest fail loudly instead of silently.
 
-The rules are drawn from three sources: the Spider codebase and its review history (y-scope/spider),
-the Rust PRs and review comments in y-scope/clp, and Microsoft's RustTraining books. Each rule cites
-the PRs, files and chapters it came from.
+The rules are drawn from three sources: the Spider codebase and its review history
+([y-scope/spider](https://github.com/y-scope/spider)), the Rust PRs and review comments in
+[y-scope/clp](https://github.com/y-scope/clp), and Microsoft's
+[RustTraining](https://microsoft.github.io/RustTraining/) books. Each rule links the PR comments,
+files and book sections it came from. File links are permalinks to Spider
+`d229555f31b40c63e2196a6d505cbbcc692cb91e` and CLP `2c617be50c21aa66968033bbcaefc4c2d8665fa2`.
 
 ## How to use this guide
 
@@ -44,17 +47,16 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
   `Option` for absence. (TYPE, TLC)
 - **Validate once, at the boundary.** Parse external data into validated types where it enters the
   process. Code behind the boundary takes those types and never checks again. (TYPE-1, BND-1)
-- **Let the compiler enforce contracts.** Exhaustive matches, move-only tokens, narrow trait bounds,
-  compile-time `Send` assertions and const asserts turn "remember to" into a build error. (DEF-1,
-  TLC-2, TLC-4, TLC-5)
+- **Let the compiler enforce contracts.** Exhaustive matches, move-only tokens, narrow trait bounds
+  and const asserts turn "remember to" into a build error. (TLC-2, TLC-4)
 - **Fail loudly and attributably.** Never invent a plausible value for bad input. Return a typed
   error that keeps its cause, handle and log it once, and take the service down when shared state is
-  corrupt. (DEF-4, DEF-6, ERR-4, ERR-5)
+  corrupt. (SRV-2, SRV-4, ERR-4, ERR-5)
 - **Keep state changes atomic and cancel-safe.** Check before the first mutation, make
-  check-then-act one step, and assume that any future can be dropped at any `.await`. (DEF-2, DEF-3,
+  check-then-act one step, and assume that any future can be dropped at any `.await`. (DEF-1, DEF-2,
   ASYNC-1, ASYNC-2)
 - **Bound everything an outsider can size.** Cap the durations, allocations, queues and payloads a
-  peer or config controls, and put a deadline on every external wait. (DEF-5, ASYNC-6, ASYNC-7,
+  peer or config controls, and put a deadline on every external wait. (SRV-3, ASYNC-6, ASYNC-7,
   BND-7)
 - **Own what you consume, borrow what you read.** Signatures state ownership honestly, and every
   resource and spawned task has an owner responsible for its cleanup. (OWN-1, OBJ-3, ASYNC-3)
@@ -74,33 +76,33 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
    - TYPE-7: Choose the numeric type whose range is the invariant
    - TYPE-8: Convert numbers with `From`/`TryFrom`, never a lossy `as`
    - TYPE-9: Return and store named enums, not positional `bool`s
-   - TYPE-10: Type opaque bytes by their encoding, and secrets by their sensitivity
+   - TYPE-10: Wrap encoded bytes in a type named after their encoding
 2. [Type-level constraints, traits and generics](#type-level-constraints-traits-and-generics) (TLC-1
-   to TLC-10)
+   to TLC-9)
    - TLC-1: Give each kind of ID its own type through a phantom marker
    - TLC-2: Bound each component by the narrowest capability it uses
    - TLC-3: Keep a statically known type as an associated type
    - TLC-4: Make a permit or proof a move-only token that only its owning module can mint
-   - TLC-5: Assert `Send`/`Sync` guarantees at compile time, next to the type
-   - TLC-6: Use associated types for types each implementor fixes, and `Infallible` for impls that
+   - TLC-5: Use associated types for types each implementor fixes, and `Infallible` for impls that
      can't fail
-   - TLC-7: Make a stateless strategy a type-only trait
-   - TLC-8: When `dyn` is justified, make the trait dyn-compatible from the start
-   - TLC-9: Use blanket impls only for behavior that is the same for every type
-   - TLC-10: Use typestate only for statically ordered protocols
-3. [Defensive programming](#defensive-programming) (DEF-1 to DEF-10)
-   - DEF-1: Match every variant of the enums you own; no catch-all arm
-   - DEF-2: Run every check that can fail before the first mutation
-   - DEF-3: Make check-then-act atomic, and let progress state only move forward
-   - DEF-4: Turn unknown, missing or unsupported input into an error, never a plausible value
-   - DEF-5: Cap every resource that a peer or a config value can size
-   - DEF-6: Return errors for what the environment can cause, and fail the whole service for broken
+   - TLC-6: Make a stateless strategy a type-only trait
+   - TLC-7: Take `self: Box<Self>` in consuming methods called through a trait object
+   - TLC-8: Use blanket impls only for behavior that is the same for every type
+   - TLC-9: Use typestate only for statically ordered protocols
+3. [Defensive programming](#defensive-programming) (DEF-1 to DEF-5)
+   - DEF-1: Run every check that can fail before the first mutation
+   - DEF-2: Make check-then-act one atomic step
+   - DEF-3: Choose an overflow behaviour for every arithmetic on unbounded values
+   - DEF-4: Decode external input with checked slicing, never indexing
+   - DEF-5: Confine `unsafe` behind a safe API, and state its contract in the right place
+4. [Server design](#server-design) (SRV-1 to SRV-5)
+   - SRV-1: Let progress state only move forward
+   - SRV-2: Turn unknown, missing or unsupported input into an error, never a plausible value
+   - SRV-3: Cap every resource that a peer or a config value can size
+   - SRV-4: Return errors for what the environment can cause, and fail the whole service for broken
      invariants
-   - DEF-7: Retry only transient failures, with backoff, and only idempotent operations
-   - DEF-8: Choose an overflow behaviour for every arithmetic on unbounded values
-   - DEF-9: Decode external input with checked slicing, never indexing
-   - DEF-10: Confine `unsafe` behind a safe API, and state its contract in the right place
-4. [Error handling](#error-handling) (ERR-1 to ERR-10)
+   - SRV-5: Retry only transient failures, with backoff, and only idempotent operations
+5. [Error handling](#error-handling) (ERR-1 to ERR-10)
    - ERR-1: Group error variants by the recovery action they need
    - ERR-2: Recover only from the variant you expect; propagate everything else
    - ERR-3: Add a variant only when a caller reacts differently, and give it typed fields
@@ -111,7 +113,7 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
    - ERR-8: Use `#[from]` only when the source type has one meaning
    - ERR-9: Make best-effort explicit in the signature
    - ERR-10: Give fallible trait methods an associated `Error` type
-5. [Designing types and their methods](#designing-types-and-their-methods) (OBJ-1 to OBJ-10)
+6. [Designing types and their methods](#designing-types-and-their-methods) (OBJ-1 to OBJ-10)
    - OBJ-1: Keep invariant-carrying fields private and make the validating path the only way in
    - OBJ-2: Return a ready-to-use value from every factory function
    - OBJ-3: Tie mandatory cleanup to a guard's `Drop`, and give the normal path a consuming method
@@ -122,7 +124,7 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
    - OBJ-8: Name methods for their contract
    - OBJ-9: Convert through the std traits
    - OBJ-10: Derive std traits when they are needed and when they mean the right thing
-6. [Ownership, borrowing and performance](#ownership-borrowing-and-performance) (OWN-1 to OWN-10)
+7. [Ownership, borrowing and performance](#ownership-borrowing-and-performance) (OWN-1 to OWN-10)
    - OWN-1: Take ownership exactly where the value must outlive the call
    - OWN-2: Expose the borrowed view, not the container
    - OWN-3: Consume at-most-once state with `Option::take` and `std::mem::take`/`replace`
@@ -133,7 +135,7 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
    - OWN-8: Borrow with in-task concurrency; spawn only for parallelism or detachment
    - OWN-9: Model graphs as an owning arena with indices, not `Rc`/`Arc` links
    - OWN-10: Use iterator adapters for pipelines and plain loops for multi-output state
-7. [Async and concurrency](#async-and-concurrency) (ASYNC-1 to ASYNC-10)
+8. [Async and concurrency](#async-and-concurrency) (ASYNC-1 to ASYNC-10)
    - ASYNC-1: Make every future you race, time out or serve safe to drop
    - ASYNC-2: Run multi-step mutations where the caller can't cancel them
    - ASYNC-3: Give every spawned task an owner and a failure destination
@@ -144,7 +146,7 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
    - ASYNC-8: Write `biased;` when `select!` priority is part of correctness
    - ASYNC-9: Give shared mutable state one owning actor
    - ASYNC-10: Design async APIs around laziness and `Send`
-8. [Serialization, config and external boundaries](#serialization-config-and-external-boundaries)
+9. [Serialization, config and external boundaries](#serialization-config-and-external-boundaries)
    (BND-1 to BND-10)
    - BND-1: Validate external data while deserializing it, not afterwards
    - BND-2: Reject unknown keys in every schema you own, and tag enums explicitly
@@ -156,21 +158,21 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
    - BND-8: Keep secrets typed, unserialized, out of logs, and compared in constant time
    - BND-9: Treat wire status codes as a contract, and keep client-facing errors coarse
    - BND-10: Read DB rows through typed projections and re-validate them as persisted data
-9. [Modules, crates and API surface](#modules-crates-and-api-surface) (MOD-1 to MOD-10)
-   - MOD-1: Give every item the narrowest visibility its intended callers need
-   - MOD-2: Treat every contract change as breaking, and make the breakage loud rather than
-     tolerated
-   - MOD-3: Declare each dependency once, pin cross-repo ones to a commit, and bump every reference
-     together
-   - MOD-4: Place code by dependency direction, and share it once a second consumer needs it
-   - MOD-5: Make `mod.rs` a table of contents: declarations and named re-exports only
-   - MOD-6: Give each shared type one owning crate and one import path
-   - MOD-7: Give user-facing crates a small facade, and keep transport and generated types private
-   - MOD-8: Keep test-only code out of the production surface and dependency graph
-   - MOD-9: Declare the intended visibility when staged code lands, and silence dead code with
-     `expect`
-   - MOD-10: Keep Cargo features additive and declare optional dependencies with `dep:`
-10. [Testing and observability for correctness](#testing-and-observability-for-correctness) (TEST-1
+10. [Modules, crates and API surface](#modules-crates-and-api-surface) (MOD-1 to MOD-10)
+    - MOD-1: Give every item the narrowest visibility its intended callers need
+    - MOD-2: Treat every contract change as breaking, and make the breakage loud rather than
+      tolerated
+    - MOD-3: Declare each dependency once, pin cross-repo ones to a commit, and bump every reference
+      together
+    - MOD-4: Place code by dependency direction, and share it once a second consumer needs it
+    - MOD-5: Make `mod.rs` a table of contents: declarations and named re-exports only
+    - MOD-6: Give each shared type one owning crate and one import path
+    - MOD-7: Give user-facing crates a small facade, and keep transport and generated types private
+    - MOD-8: Keep test-only code out of the production surface and dependency graph
+    - MOD-9: Declare the intended visibility when staged code lands, and silence dead code with
+      `expect`
+    - MOD-10: Keep Cargo features additive and declare optional dependencies with `dep:`
+11. [Testing and observability for correctness](#testing-and-observability-for-correctness) (TEST-1
     to TEST-10)
     - TEST-1: Assert the exact outcome, not a proxy for it
     - TEST-2: Bound every wait in a test, and guard loops that must make progress
@@ -184,7 +186,7 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
     - TEST-9: Log structured fields with the full error, and attach spans to spawned work with
       `.instrument`
     - TEST-10: Pin type-level guarantees with compile-fail tests
-11. [Review checklist](#review-checklist)
+12. [Review checklist](#review-checklist)
 
 # Type safety
 
@@ -253,15 +255,22 @@ async fn register(&self, submission: &ValidatedJobSubmission) -> Result<JobId, D
   input at the boundary, with an error that carries the offending value (see also coding-style.md §
   Assert preconditions instead of tolerating them).
 - When the raw type is also the public OpenAPI schema, keep the public name on the raw type and name
-  the checked type `Validated*` (y-scope/clp#2197).
+  the checked type `Validated*`
+  ([y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3069316981)).
 
-**Sources.** See also coding-style.md § Type-Level Validation, and BND-1 for running the parse
-inside serde. spider components/spider-storage/src/job_submission.rs, spider
-components/spider-storage/src/state/service.rs, spider
-components/spider-tdl-derive/src/task_macro.rs, y-scope/spider#283, y-scope/spider#351,
-y-scope/clp#1989, y-scope/clp#2197, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md, RustTraining
-rust-patterns-book/src/ch15-crate-architecture-and-api-design.md
+See also: coding-style.md § Type-Level Validation, and BND-1 for running the parse inside serde.
+
+**Sources.**
+
+- [spider `spider-storage/src/job_submission.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/job_submission.rs#L62-L151): `ValidatedJobSubmission::create` decodes and checks before anything else runs
+- [spider `spider-storage/src/state/service/state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/service/state.rs#L227-L286): `register_job` parses first and maps failure to `BadRequest`
+- [spider `spider-tdl-derive/src/task_macro.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl-derive/src/task_macro.rs#L78-L182): counter-example: `validate_*` return `()`, then `unreachable!` re-matches
+- [y-scope/spider#283](https://github.com/y-scope/spider/pull/283#discussion_r2927393656): reviewer proposes a submission type built only through graph + input validation
+- [y-scope/spider#351](https://github.com/y-scope/spider/pull/351#pullrequestreview-4566073502): validation moves into `ValidatedJobSubmission`'s factory function
+- [y-scope/clp#1989](https://github.com/y-scope/clp/pull/1989#discussion_r2807868044): reviewer proposes wrapping the validated config in a type passed down
+- [y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3069316981): reviewer suggests `TryFrom` into `ValidatedCompressionUsageParams`, keeping the OpenAPI name
+- [RustTraining type-driven-correctness-book § Parse, Don't Validate](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#parse-dont-validate): validate once at the boundary, carry the proof in the type
+- [RustTraining rust-patterns-book § Parse Don't Validate — `TryFrom` and Validated Types](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#parse-dont-validate--tryfrom-and-validated-types): validate-then-use versus parsing into a `TryFrom` newtype
 
 ## TYPE-2: Make a validated type unforgeable on every construction path
 
@@ -334,15 +343,25 @@ impl TryFrom<UncheckedTimeRange> for TimeRange {
 documented under `# Panics`, such as `NonEmptyString::from_static_str("default")` from
 clp-rust-utils' `ExpectedNonEmpty`, rather than writing an `expect` at each call site.
 
-**Sources.** See also coding-style.md § Type-Level Validation, OBJ-1 (designing the type so
-mutations can't break it) and BND-1 (the serde side). spider
-components/spider-core/src/task/task_graph.rs, spider components/spider-proto-rust/src/io.rs, spider
-components/spider-tdl/src/task_context.rs, spider components/spider-tdl/src/task.rs, spider
-components/spider-core/src/types/io/task_graph_input.rs, y-scope/spider#492, y-scope/spider#562,
-y-scope/spider#565, y-scope/clp#1769, y-scope/clp#2595, y-scope/clp#2652, clp
-components/clp-rust-libs/clp-rust-utils/src/types.rs, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md, RustTraining
-rust-patterns-book/src/ch03-the-newtype-and-type-state-patterns.md
+See also: coding-style.md § Type-Level Validation, OBJ-1 (designing the type so mutations can't
+break it) and BND-1 (the serde side).
+
+**Sources.**
+
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L62-L126): `TimeoutPolicy`: a private `validate` next to `pub` fields
+- [spider `spider-proto-rust/src/io.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/io.rs#L10-L33): the proto conversion builds `TimeoutPolicy` from wire values, unchecked
+- [spider `spider-tdl/src/task_context.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/task_context.rs#L23-L77): `TaskContext::new` validates, yet the type also derives `Deserialize`
+- [spider `spider-tdl/src/task.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/task.rs#L141-L157): the TDL gets `TaskContext` from `rmp_serde::from_slice`, skipping `new`
+- [spider `spider-core/src/types/io/task_graph_input.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/io/task_graph_input.rs#L128-L183): private fields; only the builder and the decoder construct it
+- [y-scope/spider#492](https://github.com/y-scope/spider/pull/492): `TaskGraphInput` rejects bad shared-payload references on every construction path
+- [y-scope/spider#562](https://github.com/y-scope/spider/pull/562): `PreparedChild::create` validates a child's submission before it is stored
+- [y-scope/spider#565](https://github.com/y-scope/spider/pull/565): the persisted bytes get their own type that only the validator builds
+- [y-scope/clp#1769](https://github.com/y-scope/clp/pull/1769#discussion_r2611608845): reviewer proposes one `from_static` constructor instead of scattered `unwrap`s
+- [y-scope/clp#2595](https://github.com/y-scope/clp/pull/2595): `DatasetName` validates through `FromStr`, `TryFrom`, serde and sqlx `Decode`
+- [y-scope/clp#2652](https://github.com/y-scope/clp/pull/2652): `TimeRange` rejects a reversed range at deserialization
+- [clp `clp-rust-libs/clp-rust-utils/src/types.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/clp-rust-utils/src/types.rs#L192-L223): `ExpectedNonEmpty::from_static_str`, the named panicking constructor
+- [RustTraining type-driven-correctness-book § Case Study: IPMI FRU Data](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#case-study-ipmi-fru-data): `ValidFru` has private fields and is built only via `TryFrom`
+- [RustTraining rust-patterns-book § `impl Deref` for Newtypes — Power and Pitfalls](https://microsoft.github.io/RustTraining/rust-patterns-book/ch03-the-newtype-and-type-state-patterns.html#impl-deref-for-newtypes--power-and-pitfalls): what `Deref` on a newtype exposes
 
 ## TYPE-3: Give every ID and unit its own type; a type alias is not a newtype
 
@@ -399,20 +418,29 @@ report(session_id, task_instance_id); // error[E0308]: arguments to this functio
   operator impls on quantities. Implement only the operations that make sense, for example
   `EpochMillis - EpochMillis = Duration` with no `Add` between two timestamps.
 - Flag a raw `u64` or `usize` for a peer system's identifier when that system exports a type for it.
-  For example, y-scope/clp#2681 replaced `task_index: u64` with `spider_core::task::TaskIndex`.
+  For example, [y-scope/clp#2681](https://github.com/y-scope/clp/pull/2681) replaced
+  `task_index: u64` with `spider_core::task::TaskIndex`.
 
 **Exceptions.** Config fields keep the house form of a `u64` with a unit suffix in the name, which
 is what carries the meaning there (coding-style.md § Prefer `u64` seconds over `Duration` for time
 config). `pub type` aliases for *external* types remain the house style (coding-style.md § Type
 Aliases for External Types). This rule covers domain identifiers and quantities.
 
-**Sources.** spider components/spider-core/src/types/id.rs, spider
-components/spider-proto-rust/src/unpack/storage.rs, spider
-components/spider-execution-manager/src/client/storage.rs, clp
-components/clp-rust-libs/clp-rust-utils/src/types.rs, y-scope/clp#2420, y-scope/clp#2503,
-y-scope/clp#2504, y-scope/clp#2531, y-scope/clp#2676, y-scope/clp#2681, y-scope/spider#337,
-RustTraining type-driven-correctness-book/src/ch06-dimensional-analysis-making-the-compiler.md,
-RustTraining rust-patterns-book/src/ch03-the-newtype-and-type-state-patterns.md
+**Sources.**
+
+- [spider `spider-core/src/types/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L29-L33): `Id<TypeMarker>`; `SessionId` and `TaskInstanceId` ([L174-L176](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L174-L176)) are still `u64` aliases
+- [spider `spider-proto-rust/src/unpack/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/unpack/storage.rs#L84-L113): an unpack tuple holding `SessionId` and `TaskInstanceId` side by side
+- [spider `spider-execution-manager/src/client/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/storage.rs#L101-L109): `report_task_success` takes both `u64` aliases positionally
+- [clp `clp-rust-libs/clp-rust-utils/src/types.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/clp-rust-utils/src/types.rs#L16-L73): `ArchiveId`, a `Uuid` newtype whose serde and sqlx impls delegate to it
+- [y-scope/clp#2420](https://github.com/y-scope/clp/pull/2420#discussion_r3654279704): reviewer asks for `IngestionJobId` and `S3ObjectMetadataId` instead of `u64`
+- [y-scope/clp#2503](https://github.com/y-scope/clp/pull/2503#discussion_r3884620341): reviewer asks for a dedicated query job ID type in clp-rust-utils
+- [y-scope/clp#2504](https://github.com/y-scope/clp/pull/2504#discussion_r3917430304): reviewer asks to replace raw-string archive IDs with a UUID type
+- [y-scope/clp#2531](https://github.com/y-scope/clp/pull/2531): the `NonEmptyString` archive ID alias becomes a `Uuid`-backed newtype
+- [y-scope/clp#2676](https://github.com/y-scope/clp/pull/2676#discussion_r4487980675): reviewer asks for Spider's task index type instead of a raw `u64`
+- [y-scope/clp#2681](https://github.com/y-scope/clp/pull/2681): the handshake's `task_index` becomes `spider_core::task::TaskIndex`
+- [y-scope/spider#337](https://github.com/y-scope/spider/pull/337): IDs stay typed `Id<TypeMarker>` while their raw value becomes `u64`
+- [RustTraining type-driven-correctness-book § Newtypes for Physical Quantities](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch06-dimensional-analysis-making-the-compiler.html#newtypes-for-physical-quantities): unit newtypes turn mixed-unit arithmetic into compile errors
+- [RustTraining rust-patterns-book § Newtype: Zero-Cost Type Safety](https://microsoft.github.io/RustTraining/rust-patterns-book/ch03-the-newtype-and-type-state-patterns.html#newtype-zero-cost-type-safety): distinct newtypes over one primitive, at no run-time cost
 
 ## TYPE-4: Represent absence with `Option`, never with a sentinel
 
@@ -423,11 +451,12 @@ external format uses a sentinel, convert it to `None` at the first parse step. K
 separate from "malformed", and substitute a display placeholder only at the presentation edge.
 
 **Why.** A sentinel looks exactly like a real value, so every consumer has to remember the magic
-check, and the one that forgets works on made-up data. In y-scope/clp#2567, `max_num_results` used 0
-to mean "unlimited" while another layer had already replaced 0 with a default, so callers who left
-the field out were silently capped. With `Option<NonZeroU32>`, `None` means unlimited and 0 is
-rejected. Calling `.unwrap_or(0)` or `.ok()` on a parse result is just as bad: a corrupt field turns
-into "not present", and the original error is lost.
+check, and the one that forgets works on made-up data. In
+[y-scope/clp#2567](https://github.com/y-scope/clp/pull/2567), `max_num_results` used 0 to mean
+"unlimited" while another layer had already replaced 0 with a default, so callers who left the field
+out were silently capped. With `Option<NonZeroU32>`, `None` means unlimited and 0 is rejected.
+Calling `.unwrap_or(0)` or `.ok()` on a parse result is just as bad: a corrupt field turns into "not
+present", and the original error is lost.
 
 ```rust,ignore
 // Bad
@@ -463,17 +492,29 @@ let sensor_num = bytes
   rejects `""`. SQL columns follow the same rule: make them nullable instead of storing `''`.
 
 **Exceptions.** If `None` and "empty" would mean exactly the same thing, keep a single
-representation, usually an empty `Vec` rather than `Option<Vec<_>>` (y-scope/spider#293). In
+representation, usually an empty `Vec` rather than `Option<Vec<_>>`
+([y-scope/spider#293](https://github.com/y-scope/spider/pull/293#discussion_r3024981899)). In
 storage, a self-reference can be a deliberate choice over NULL for index or write-cost reasons
-(y-scope/spider#531), but write the reason down.
+([y-scope/spider#531](https://github.com/y-scope/spider/pull/531#discussion_r4309555633)), but write
+the reason down.
 
-**Sources.** See also DEF-4 (unknown input is an error) and ERR-2 (don't hide errors with `.ok()`).
-y-scope/clp#1728, y-scope/clp#1776, y-scope/clp#2180, y-scope/clp#2251, y-scope/clp#2503,
-y-scope/clp#2513, y-scope/clp#2567, y-scope/clp#2597, spider
-components/spider-scheduler/src/core_impl/inbound_queue_reader.rs, spider
-components/spider-core/src/types/id.rs, RustTraining
-type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md, RustTraining
-python-book/src/ch16-best-practices.md
+See also: SRV-2 (unknown input is an error) and ERR-2 (don't hide errors with `.ok()`).
+
+**Sources.**
+
+- [y-scope/clp#1728](https://github.com/y-scope/clp/pull/1728#discussion_r2587287081): the S3 endpoint becomes optional instead of a hard-coded AWS URL
+- [y-scope/clp#1776](https://github.com/y-scope/clp/pull/1776#discussion_r2625610254): reviewer settles on `Option<NonEmptyString>` for the endpoint
+- [y-scope/clp#2180](https://github.com/y-scope/clp/pull/2180#discussion_r3085560909): reviewer: 0 is a limit of 0, and another layer already replaced it
+- [y-scope/clp#2251](https://github.com/y-scope/clp/pull/2251#discussion_r3207531702): reviewer flags `Option<bool>` as a needless third state
+- [y-scope/clp#2503](https://github.com/y-scope/clp/pull/2503#discussion_r3890492612): reviewer asks for `Option<NonZeroU32>` so that "unlimited" is expressible
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r3963857670): reviewer: pass `None`, never an empty string, for "no message"
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r4139055514): reviewer asks for a nullable column instead of an empty string
+- [y-scope/clp#2567](https://github.com/y-scope/clp/pull/2567): an omitted result limit now means unlimited, not a silent default
+- [y-scope/clp#2597](https://github.com/y-scope/clp/pull/2597#issuecomment-6375278635): an empty `timestamp_key` should become `None` at the CLI and WebUI
+- [spider `spider-scheduler/src/core_impl/inbound_queue_reader.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/inbound_queue_reader.rs#L155-L221): counter-example: an unpolled lane reports session ID `0`
+- [spider `spider-core/src/types/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L35-L39): counter-example: `Default` for `Id` yields ID 0
+- [RustTraining type-driven-correctness-book § Sentinel → `Option` at the Boundary](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-1--sentinel--option-at-the-boundary): convert a format's sentinel to `None` at the first parse
+- [RustTraining python-book § Exercises](https://microsoft.github.io/RustTraining/python-book/ch16-best-practices.html#exercises): takeaway: return `Option` instead of a sentinel such as `""`
 
 ## TYPE-5: Model exclusive modes and dependent fields as one enum or one struct
 
@@ -489,9 +530,10 @@ independent `Option`s.
 network address *and* a cache limit, a running job with no Spider job ID, a resource-group ID with
 no password. Every consumer then needs its own runtime check, and the one that misses it either
 panics or sends the work to the wrong place. An enum makes those states impossible to write, and its
-exhaustive `match` shows every site that needs updating when a mode is added. In y-scope/clp#2705,
-returning `(Session, ResultStream)` let a caller pair one session's stream with a different session.
-An `OpenSession` that only the registry can construct made that pairing impossible.
+exhaustive `match` shows every site that needs updating when a mode is added. In
+[y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705#discussion_r4558363049), returning
+`(Session, ResultStream)` let a caller pair one session's stream with a different session. An
+`OpenSession` that only the registry can construct made that pairing impossible.
 
 ```rust,ignore
 // Bad
@@ -526,7 +568,8 @@ pub enum TaskId {
   groups of `is_*` booleans that describe one lifecycle, and `const` reserved values in an ID or
   index space.
 - Flag a single `FromRow` struct with an `Option` column that encodes the row's state. Use one row
-  type per query shape, or an enum over them (y-scope/clp#2435).
+  type per query shape, or an enum over them
+  ([y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3736816199)).
 - Flag functions that take or return a tuple of values that must come from the same creation, and
   lossy projections of a config enum such as `Option<(&str, &str)>`. Pass the enum or the bundle
   instead, and put the variant-specific logic on it as a method.
@@ -534,13 +577,22 @@ pub enum TaskId {
 **Exceptions.** Keep separate `Option` fields when every combination is valid and its meaning is
 documented, for example an aggregation that runs regardless of `max_num_results`.
 
-**Sources.** See also coding-style.md § API design (named fields over positional tuples) and § Enum
-vs Trait Objects. y-scope/clp#1962, y-scope/clp#2435, y-scope/clp#2561, y-scope/clp#2613,
-y-scope/clp#2652, y-scope/clp#2705, y-scope/spider#464, spider
-components/spider-core/src/types/id.rs, spider
-components/spider-storage/src/db/mariadb/tree_transition.rs, spider
-components/spider-core/src/types/resource_group.rs, RustTraining
-python-book/src/ch06-enums-and-pattern-matching.md
+See also: coding-style.md § API design (named fields over positional tuples) and § Enum vs Trait
+Objects.
+
+**Sources.**
+
+- [y-scope/clp#1962](https://github.com/y-scope/clp/pull/1962#discussion_r2912583038): take an `AwsAuthentication` instead of an `Option<(&str, &str)>` projection
+- [y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3736816199): reviewer: keep pending and running row types apart, or use an enum
+- [y-scope/clp#2561](https://github.com/y-scope/clp/pull/2561#discussion_r4264475291): reviewer: the result limit and the bucket size belong in one enum
+- [y-scope/clp#2613](https://github.com/y-scope/clp/pull/2613#discussion_r4383914186): reviewer: the output must be one of three, so use an enum
+- [y-scope/clp#2652](https://github.com/y-scope/clp/pull/2652): the `QueryOutput` enum replaces flat output fields and their combination checks
+- [y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705#discussion_r4558363049): reviewer proposes `OpenSession`, built only by the registry
+- [y-scope/spider#464](https://github.com/y-scope/spider/pull/464#discussion_r3897529935): reviewer asks to bundle the ID and password in one credentials type
+- [spider `spider-core/src/types/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L131-L142): `TaskId::{Index, Commit, Cleanup}`
+- [spider `spider-storage/src/db/mariadb/tree_transition.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/mariadb/tree_transition.rs#L381-L386): `UpdateRows`: either every row carries outputs or none does
+- [spider `spider-core/src/types/resource_group.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/resource_group.rs#L12-L20): `ExternalResourceGroupCredentials` bundles the external ID and its password
+- [RustTraining python-book § Rust Enums — Data-Carrying Variants](https://microsoft.github.io/RustTraining/python-book/ch06-enums-and-pattern-matching.html#rust-enums--data-carrying-variants): each variant carries its own data, matched exhaustively
 
 ## TYPE-6: Parse closed sets of strings into enums, with no catch-all default
 
@@ -555,7 +607,9 @@ gives no compile error at the sites that need updating. A `_ =>` arm that maps u
 default variant is worse. A config typo such as `"extendedd"` silently gets the default mode, and an
 unexpected value from a peer is classified as whatever the catch-all happens to return. A
 hand-written `resolve_job_status(&str) -> Option<i32>` duplicates the enum, drifts away from it, and
-lets bare integers into business logic; y-scope/clp#2197 removed exactly that.
+lets bare integers into business logic;
+[y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3068022834) removed exactly
+that.
 
 ```rust,ignore
 // Bad
@@ -589,17 +643,22 @@ let health: HealthStatus = raw.parse()?;
 **Review.**
 - Flag a `String` field or parameter whose valid values could be listed, and `match` or `==` on
   string literals outside a parser. The fix is an enum parsed at the boundary.
-- Flag `_ =>` arms in a parser, and in any `match` over a domain enum that decides behavior (DEF-1).
+- Flag `_ =>` arms in a parser, and in any `match` over a domain enum that decides behavior.
   When every variant is listed, the compiler points at the match when a variant is added.
 - Flag a `HashMap<KeyEnum, V>` read through `map[&key]` when the key set is fixed. Use a struct with
   one field per key and `#[serde(deny_unknown_fields)]`, so a missing or misspelled key fails at
-  parse time instead of panicking at the lookup (y-scope/clp#1828).
+  parse time instead of panicking at the lookup
+  ([y-scope/clp#1828](https://github.com/y-scope/clp/pull/1828#discussion_r2636456469)).
 
-**Sources.** See also coding-style.md § Avoid hardcoded state values, DEF-1 (exhaustive matching)
-and DEF-4 (unknown input is an error). y-scope/clp#1828, y-scope/clp#2197, RustTraining
-type-driven-correctness-book/src/ch01-the-philosophy-why-types-beat-tests.md, RustTraining
-type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md, RustTraining
-type-driven-correctness-book/src/ch17-redfish-applied-walkthrough.md
+See also: coding-style.md § Avoid hardcoded state values and SRV-2 (unknown input is an error).
+
+**Sources.**
+
+- [y-scope/clp#1828](https://github.com/y-scope/clp/pull/1828#discussion_r2636456469): reviewer agrees that `names[&ClpDbNameType::Clp]` panics on a missing key
+- [y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3068022834): reviewer: replace `resolve_job_status` and reuse `CompressionJobStatus`
+- [RustTraining type-driven-correctness-book § The Cost of Runtime Checking](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch01-the-philosophy-why-types-beat-tests.html#the-cost-of-runtime-checking): a string `match` misses typos and new variants
+- [RustTraining type-driven-correctness-book § `FromStr` as a Validation Boundary](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-5--fromstr-as-a-validation-boundary): an `"extendedd"` typo silently gets the default mode
+- [RustTraining type-driven-correctness-book § Typed Telemetry Reads (Typed Commands + Dimensional Analysis, ch02 + ch06)](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch17-redfish-applied-walkthrough.html#section-4--typed-telemetry-reads-typed-commands--dimensional-analysis-ch02--ch06): its `parse_health` is the `_ =>` catch-all this rule rejects
 
 ## TYPE-7: Choose the numeric type whose range is the invariant
 
@@ -611,13 +670,15 @@ consumer (wire, DB, C++ core, BSON), and add a validated newtype when those cons
 
 **Why.** A zero capacity panics in `mpsc::channel` or leaves every `Semaphore::acquire` waiting
 forever. A zero divisor panics in `div_ceil`, a zero heartbeat period panics in
-`tokio::time::interval` (y-scope/spider#362), and a zero tick interval busy-spins the scheduler
-loop. All of these fail far away from the config file that caused them. In y-scope/spider#367,
-switching to `NonZero*` deleted the hand-written `validate()` methods, their `InvalidConfig`
-variants and the `Result` on the constructors. A type that merely looks tight can also backfire. In
-y-scope/clp#2561, a `NonZeroU32` millisecond bucket size overflows on a WebUI timeline longer than
-about 3 years, while clp-s and MongoDB both expect `i64`. That is why the field is now `PositiveI64`
-(deserialized `try_from = "NonZeroU64"`).
+`tokio::time::interval` ([y-scope/spider#362](https://github.com/y-scope/spider/pull/362)), and a
+zero tick interval busy-spins the scheduler loop. All of these fail far away from the config file
+that caused them. In [y-scope/spider#367](https://github.com/y-scope/spider/pull/367), switching to
+`NonZero*` deleted the hand-written `validate()` methods, their `InvalidConfig` variants and the
+`Result` on the constructors. A type that merely looks tight can also backfire. In
+[y-scope/clp#2561](https://github.com/y-scope/clp/pull/2561#pullrequestreview-5555514247), a
+`NonZeroU32` millisecond bucket size overflows on a WebUI timeline longer than about 3 years, while
+clp-s and MongoDB both expect `i64`. That is why the field is now `PositiveI64` (deserialized
+`try_from = "NonZeroU64"`).
 
 ```rust,ignore
 // Bad
@@ -656,13 +717,23 @@ fn set_max_retries(max_retries: u32) { /* ... */ }
 - Before accepting a numeric field's width, ask where else the value goes (a DB column, BSON, the
   C++ parser).
 
-**Sources.** See also coding-style.md § Use `u64` for sizes that may exceed 32-bit, DEF-5 (upper
-caps) and BND-6 (defaults that must not be zero). spider components/spider-scheduler/src/config.rs,
-spider components/spider-scheduler/src/execution_manager_registry.rs, spider
-components/spider-scheduler/src/runtime.rs, y-scope/spider#334, y-scope/spider#362,
-y-scope/spider#367, y-scope/spider#396, y-scope/clp#2150, y-scope/clp#2561, y-scope/clp#2668, clp
-components/clp-rust-libs/clp-rust-utils/src/types.rs, RustTraining
-rust-patterns-book/src/ch15-crate-architecture-and-api-design.md
+See also: coding-style.md § Use `u64` for sizes that may exceed 32-bit, SRV-3 (upper caps) and BND-6
+(defaults that must not be zero).
+
+**Sources.**
+
+- [spider `spider-scheduler/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/config.rs#L15-L34): `connection_pool_size: NonZeroUsize`
+- [spider `spider-scheduler/src/execution_manager_registry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/execution_manager_registry.rs#L30-L38): the dead-EM cutoff and the tracking interval are `NonZeroU64`
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L85-L164): `create_runtime` can fail only on registration, not on config
+- [y-scope/spider#334](https://github.com/y-scope/spider/pull/334): adds the round-robin core, whose capacities and tick interval are config
+- [y-scope/spider#362](https://github.com/y-scope/spider/pull/362): adds the EM binary, whose heartbeat intervals reach `tokio::time::interval`
+- [y-scope/spider#367](https://github.com/y-scope/spider/pull/367): `NonZero*` fields replace `validate()`, `InvalidConfig` and fallible constructors
+- [y-scope/spider#396](https://github.com/y-scope/spider/pull/396): adds the client's pool-size and retry settings
+- [y-scope/clp#2150](https://github.com/y-scope/clp/pull/2150#pullrequestreview-4039460381): a zero `channel_capacity` panics at channel creation and kills the job
+- [y-scope/clp#2561](https://github.com/y-scope/clp/pull/2561#pullrequestreview-5555514247): a `u32` bucket size overflows, so `PositiveI64` matches BSON's `i64`
+- [y-scope/clp#2668](https://github.com/y-scope/clp/pull/2668#discussion_r4496882129): reviewer types the throughput divisors as `NonZeroU64`
+- [clp `clp-rust-libs/clp-rust-utils/src/types.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/clp-rust-utils/src/types.rs#L140-L190): `PositiveI64`, deserialized `try_from = "NonZeroU64"`
+- [RustTraining rust-patterns-book § The Solution: Parse Into Validated Newtypes with `TryFrom`](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#the-solution-parse-into-validated-newtypes-with-tryfrom): `Port(u16)` checks only for 0, since `u16` caps the top
 
 ## TYPE-8: Convert numbers with `From`/`TryFrom`, never a lossy `as`
 
@@ -678,7 +749,8 @@ silently drops the high bits, and `f64::NAN as u32` is 0. The wrong value passes
 and ends up in a size, an offset or an ID. A cast that is safe today also turns lossy without
 warning when someone widens the source type, whereas a `From` call stops compiling. Whether a failed
 conversion returns an error or panics follows the house rule: an overflowing DB-generated ID is not
-this component's bug, so it returns an error (y-scope/clp#2017).
+this component's bug, so it returns an error
+([y-scope/clp#2017](https://github.com/y-scope/clp/pull/2017#discussion_r2849514515)).
 
 ```rust,ignore
 // Bad
@@ -710,14 +782,23 @@ let index = u64::try_from(task_index).expect("`usize` always fits in `u64`");
 **Exceptions.** `as` is acceptable for a `#[repr]` enum to its discriminant, for a deliberate bit
 reinterpretation with a comment, for a float-to-int cast right after an explicit range check, for an
 integer-to-float conversion in metrics or ratios, where rounding is acceptable, and for a lossless
-widening inside a `const` item, where `From` isn't callable (DEF-8).
+widening inside a `const` item, where `From` isn't callable (DEF-3).
 
-**Sources.** See also pr-review.md § Panic vs error returns, DEF-8 (overflow in arithmetic), BND-4
-(proto fields) and BND-7 (wire lengths). spider components/spider-proto-rust/src/unpack/storage.rs,
-spider components/spider-proto-rust/src/id.rs, spider components/spider-core/src/types/io/mod.rs,
-y-scope/spider#492, y-scope/clp#1989, y-scope/clp#2017, y-scope/clp#2180, y-scope/clp#2224,
-RustTraining c-cpp-book/src/ch18-cpp-rust-semantic-deep-dives.md, RustTraining
-csharp-book/src/ch03-built-in-types-and-variables.md
+See also: pr-review.md § Panic vs error returns, DEF-3 (overflow in arithmetic), BND-4 (proto
+fields) and BND-7 (wire lengths).
+
+**Sources.**
+
+- [spider `spider-proto-rust/src/unpack/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/unpack/storage.rs#L195-L206): `u16::try_from` on the wire port, with the value in the error
+- [spider `spider-proto-rust/src/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/id.rs#L8-L34): `usize::try_from` errors on wire input; `u64::try_from` expects locally
+- [spider `spider-core/src/types/io/mod.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/io/mod.rs#L134-L148): `as u8` on a `#[repr(u8)]` enum, the allowed exception
+- [y-scope/spider#492](https://github.com/y-scope/spider/pull/492): `TaskGraphInputBuilder` converts shared input IDs with `u32::try_from`
+- [y-scope/clp#1989](https://github.com/y-scope/clp/pull/1989#discussion_r2806928070): reviewer suggests `usize::from` instead of `as usize`
+- [y-scope/clp#2017](https://github.com/y-scope/clp/pull/2017#discussion_r2849514515): an overflowing DB ID isn't this component's bug, so return an error
+- [y-scope/clp#2180](https://github.com/y-scope/clp/pull/2180#discussion_r3085560909): reviewer: `u32` to `usize` isn't safe on every platform; use `try_into`
+- [y-scope/clp#2224](https://github.com/y-scope/clp/pull/2224#discussion_r3149859975): the S3 object size goes from `i64` to `u64` through `try_into`
+- [RustTraining c-cpp-book § Casting Hierarchy: Four C++ Casts → Rust Equivalents](https://microsoft.github.io/RustTraining/c-cpp-book/ch18-cpp-rust-semantic-deep-dives.html#casting-hierarchy-four-c-casts--rust-equivalents): `300_u16 as u8` wraps to 44; narrow with `TryFrom`
+- [RustTraining csharp-book § Numeric Conversions](https://microsoft.github.io/RustTraining/csharp-book/ch03-built-in-types-and-variables.html#numeric-conversions): `as` truncates and wraps, while `try_from` returns a `Result`
 
 ## TYPE-9: Return and store named enums, not positional `bool`s
 
@@ -779,49 +860,61 @@ let finalize_queue: VecDeque<(JobId, FinalizeKind)> = VecDeque::new();
 the meaning (coding-style.md § Prefer Booleans Over Small Enum Subsets). True predicates such as
 `is_empty` and `is_valid_transition` also stay `bool`.
 
-**Sources.** y-scope/clp#2053, y-scope/clp#2513, y-scope/clp#2589, y-scope/clp#2617,
-y-scope/clp#2662, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs, clp
-components/log-ingestor/src/ingestion_job_manager.rs, clp
-components/query-coordinator/src/job_handle.rs, clp
-components/query-coordinator/src/query_job_submitter/mod.rs, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md
+**Sources.**
 
-## TYPE-10: Type opaque bytes by their encoding, and secrets by their sensitivity
+- [y-scope/clp#2053](https://github.com/y-scope/clp/pull/2053#discussion_r2870451058): reviewer: don't return `bool` for different states, even binary ones
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#pullrequestreview-5286744460): `TerminalQueryJobStatus` makes "must be terminal" unrepresentable
+- [y-scope/clp#2589](https://github.com/y-scope/clp/pull/2589#discussion_r4355503709): reviewer suggests a three-state enum instead of a `bool`
+- [y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617): `request_cancellation` returns the job's `Cancellability` to the caller
+- [y-scope/clp#2662](https://github.com/y-scope/clp/pull/2662#discussion_r4459562723): an enum reads clearer than a `bool` for `Claim`
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs#L42-L47): `FinalizeKind::{Commit, Cleanup}`, stored in the finalize queue
+- [clp `log-ingestor/src/ingestion_job_manager.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/log-ingestor/src/ingestion_job_manager.rs#L47-L53): `TerminalStatus::{Finished, Failed}`
+- [clp `query-coordinator/src/job_handle.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/query-coordinator/src/job_handle.rs#L393-L478): `terminate(outcome: QueryJobOutcome)`
+- [clp `query-coordinator/src/query_job_submitter/mod.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/query-coordinator/src/query_job_submitter/mod.rs#L37-L48): `QueryJobOutcome`, with a message only on `Failed`
+- [RustTraining type-driven-correctness-book § From Parsed Events to Redfish Health: The Consumer Pipeline](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#from-parsed-events-to-redfish-health-the-consumer-pipeline): replaces a lossy `has_critical_events: bool` with a typed summary
 
-**Rule.** When a `Vec<u8>` must hold one specific encoding (a msgpack `ExecutorError`, framed task
-inputs, zstd-compressed JSON), wrap it in a newtype named after that encoding. Only the encoder
-should be able to construct it, and it should offer a `decode()`. Keep passwords and tokens in a
-secret wrapper such as `secrecy::SecretSlice<u8>` across every API that carries them, and compare
-them with `subtle::ConstantTimeEq` rather than `==`. BND-8 covers how secrets are deserialized,
-logged and compared at the boundary.
+## TYPE-10: Wrap encoded bytes in a type named after their encoding
 
-**Why.** In Spider's execution manager, a bare `Vec<u8>` documented as "the msgpack-encoded error"
-was rendered with `String::from_utf8_lossy`, so storage recorded garbage for every in-task failure.
-`Vec::new()` type-checked as "empty task inputs" but is not a valid zero-frame stream, so every
-commit task failed in the executor (y-scope/spider#405). In both cases, a newtype that only
-`decode()` and the serializer can touch would have turned the bug into a compile error. On the
-secrets side, `ExternalResourceGroupCredentials` keeps its password in a `SecretSlice`, so `Debug`
-redacts it. But `verify_resource_group(password: Vec<u8>)` takes the password back out of the
-wrapper, and from that point a single `?creds` in a log line prints it.
+**Rule.** When a `Vec<u8>` holds one specific encoding, such as a msgpack-encoded `ExecutorError`, a
+wire-framed task-input stream or zstd-compressed JSON, wrap it in a newtype named after that
+encoding. Keep the field private. Let only the matching encoder create the value and only the
+matching decoder read it. Carry the newtype through every layer, and take the raw bytes out only at
+the I/O call that writes them.
+
+**Why.** A bare `Vec<u8>` states its encoding only in a comment, and the compiler accepts any bytes
+in its place. Spider's execution manager hit both failure modes. `Outcome::InTaskFailure` carries
+"the msgpack-encoded `ExecutorError`" as a `Vec<u8>`, and the code that reports it renders those
+bytes with `String::from_utf8_lossy`, so the failure message stored for every in-task failure is
+mangled msgpack instead of the error text. Task inputs were also a plain `Vec<u8>`, so `Vec::new()`
+type-checked as "no inputs" even though the executor expects a wire-framed stream. Every commit task
+failed until [y-scope/spider#405](https://github.com/y-scope/spider/pull/405) replaced it with a
+valid zero-frame buffer. With an encoding newtype, neither bug compiles: the only way to read the
+error is `decode()`, and the only way to build inputs is the serializer.
 
 ```rust,ignore
 // Bad
 pub enum Outcome {
-    InTaskFailure { error: Vec<u8> }, // msgpack-encoded `ExecutorError`
+    /// `error` is the msgpack-encoded `ExecutorError`.
+    InTaskFailure { error: Vec<u8> },
 }
 
 let message = String::from_utf8_lossy(&error).into_owned();
-let raw_inputs: Vec<u8> = Vec::new();
+let commit_task_inputs: Vec<u8> = Vec::new();
 ```
 
 ```rust,ignore
 // Good
-pub struct MsgpackExecutorError(Vec<u8>);
+pub struct MsgpackExecutorError {
+    bytes: Vec<u8>,
+}
 
 impl MsgpackExecutorError {
+    pub fn encode(error: &ExecutorError) -> Result<Self, rmp_serde::encode::Error> {
+        Ok(Self { bytes: rmp_serde::to_vec(error)? })
+    }
+
     pub fn decode(&self) -> Result<ExecutorError, rmp_serde::decode::Error> {
-        rmp_serde::from_slice(&self.0)
+        rmp_serde::from_slice(&self.bytes)
     }
 }
 
@@ -829,26 +922,31 @@ pub enum Outcome {
     InTaskFailure { error: MsgpackExecutorError },
 }
 
-let raw_inputs = TaskInputsSerializer::new().release();
+let message = error.decode()?.to_string();
+let commit_task_inputs: WireFramedTaskInputs = TaskInputsSerializer::new().release();
 ```
 
 **Review.**
-- Flag `Vec<u8>` fields and parameters, and `Result<Vec<u8>, Vec<u8>>` types, whose meaning lives
-  only in a comment. Also flag any hand-built "empty" or literal encoded buffer. Tests should assert
-  the exact encoded bytes rather than `is_empty()`.
-- Flag a secret that crosses a function boundary as a `Vec<u8>` or `String`, a `#[derive(Debug)]` on
-  a struct that holds a raw secret, and `==` between secrets.
+- Flag `Vec<u8>` fields, parameters and aliases, such as `Result<Vec<u8>, Vec<u8>>`, whose encoding
+  is stated only in a comment or docstring. Ask for one newtype per encoding.
+- Flag `String::from_utf8` or `from_utf8_lossy` on bytes that aren't UTF-8 text, and hand-built
+  encoded buffers (`Vec::new()`, `vec![..]`, byte literals) where an encoder exists.
+- Flag tests that check an encoded buffer with `is_empty()`. An empty buffer may not be a valid
+  encoding, so assert on the decoded value instead.
 
-**Exceptions.** A wrapper has to prevent a real misuse. y-scope/clp#1704 dropped `SecretString` from
-the AWS secret-key path, where it only added conversions. When a reviewer asks what a newtype
-actually prevents, the answer must be concrete.
+**Exceptions.** Bytes whose encoding the holding code doesn't rely on, such as a payload it stores
+or forwards unchanged for someone else to decode, can stay `Vec<u8>`.
 
-**Sources.** See also coding-style.md § Binary Serialization and BND-8. spider
-components/spider-execution-manager/src/process_pool.rs, spider
-components/spider-execution-manager/src/runtime.rs, spider components/spider-tdl/src/task.rs, spider
-components/spider-core/src/types/resource_group.rs, spider
-components/spider-storage/src/db/mariadb/resource_group.rs, spider
-components/spider-client/src/client.rs, y-scope/spider#292, y-scope/spider#405, y-scope/clp#1704
+See also: coding-style.md § Binary Serialization. BND-8 covers secrets, the other kind of byte
+buffer that needs its own type.
+
+**Sources.**
+
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L66-L83): `InTaskFailure { error: Vec<u8> }`, msgpack only by comment
+- [spider `spider-execution-manager/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/runtime.rs#L541-L592): `from_outcome` renders that error with `String::from_utf8_lossy`
+- [spider `spider-tdl/src/task.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/task.rs#L15-L21): `ExecutionResult = Result<Vec<u8>, Vec<u8>>`, documented only in prose
+- [y-scope/spider#292](https://github.com/y-scope/spider/pull/292#discussion_r3024204286): reviewer: don't serialize byte arrays into UTF-8 strings
+- [y-scope/spider#405](https://github.com/y-scope/spider/pull/405): a commit task's empty inputs are framed as a valid wire frame
 
 # Type-level constraints, traits and generics
 
@@ -872,10 +970,12 @@ two arguments are swapped, and the bug only shows up as a wrong row in the DB. A
 `pub type SessionId = u64;` alias gives no protection either. A marker per entity turns the swap
 into a type error at no runtime cost. There is one trap: `#[derive(Clone, Copy, Hash)]` on
 `Id<TypeMarker>` generates `impl<TypeMarker: Clone> Clone for Id<TypeMarker>`, even though
-`TypeMarker` appears only inside `PhantomData`. In y-scope/spider#271 the markers derived only
+`TypeMarker` appears only inside `PhantomData`. In
+[y-scope/spider#271](https://github.com/y-scope/spider/pull/271) the markers derived only
 `Debug, PartialEq, Eq`, so `JobId` was silently neither `Copy` nor `Hash` despite the derive on
-`Id`. y-scope/spider#309 had to add the missing derives. Bounds on the definition itself
-(`Id<TypeMarker: Debug + PartialEq + Eq>`) gain nothing, and every `impl` block has to repeat them.
+`Id`. [y-scope/spider#309](https://github.com/y-scope/spider/pull/309) had to add the missing
+derives. Bounds on the definition itself (`Id<TypeMarker: Debug + PartialEq + Eq>`) gain nothing,
+and every `impl` block has to repeat them.
 
 ```rust,ignore
 // Bad
@@ -931,8 +1031,12 @@ wire, as long as it is converted right away. IDs with real structure (for exampl
 unit needs its own type, and coding-style.md § Type-Level Validation, which covers validated values;
 this rule covers how identity is built.
 
-**Sources.** spider components/spider-core/src/types/id.rs, y-scope/spider#271, y-scope/spider#309,
-RustTraining rust-patterns-book/src/ch04-phantomdata-types-that-carry-no-data.md
+**Sources.**
+
+- [spider `spider-core/src/types/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L14-L172): generic `Id<TypeMarker>`, encodings on the generic, one marker per entity
+- [y-scope/spider#271](https://github.com/y-scope/spider/pull/271): markers derive only `Debug, PartialEq, Eq` under a `Copy, Hash` wrapper
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309): change adds the missing `Hash` derive to every marker
+- [RustTraining rust-patterns-book § Unit-of-Measure Pattern](https://microsoft.github.io/RustTraining/rust-patterns-book/ch04-phantomdata-types-that-carry-no-data.html#unit-of-measure-pattern): zero-sized markers in `PhantomData` keep same-representation values apart
 
 ## TLC-2: Bound each component by the narrowest capability it uses
 
@@ -942,13 +1046,15 @@ IngestionJobState + SqsListenerState`). Don't add conveniences that turn one cap
 another, such as a `Reader::writer()`.
 
 **Why.** Narrow bounds document what a component can do: a GC loop can't accidentally delete
-resource groups, and the SQS listener can't call the S3 scanner's state methods. In y-scope/clp#2001
-the reviewer rejected `IngestionJobState: SqsListenerState + S3ScannerState`, because it forces
-every state implementation to provide methods for job types it never runs. Mocks also shrink to the
-one trait under test. In y-scope/spider#339 a reviewer removed a write-through-the-reader shortcut:
-the reader/writer split exists so that the types show who can mutate shared outputs, and an escape
-hatch makes every reader a writer. Coding agents tend to add such shortcuts just to make a change
-compile.
+resource groups, and the SQS listener can't call the S3 scanner's state methods. In
+[y-scope/clp#2001](https://github.com/y-scope/clp/pull/2001#discussion_r2820703495) the reviewer
+rejected `IngestionJobState: SqsListenerState + S3ScannerState`, because it forces every state
+implementation to provide methods for job types it never runs. Mocks also shrink to the one trait
+under test. In
+[y-scope/spider#339](https://github.com/y-scope/spider/pull/339#discussion_r3383142317) a reviewer
+removed a write-through-the-reader shortcut: the reader/writer split exists so that the types show
+who can mutate shared outputs, and an escape hatch makes every reader a writer. Coding agents tend
+to add such shortcuts just to make a change compile.
 
 ```rust,ignore
 // Bad
@@ -990,13 +1096,20 @@ async fn gc_loop<StorageType: InternalJobOrchestration>(
 
 **Exceptions.** The composition root that wires the service together may take the aggregate trait or
 the concrete type. A server-side manager that only ever runs against one concrete state may use that
-type directly (y-scope/clp#2001). See also: pr-review.md § Trait surface minimization. That rule
-covers which methods a trait has, and this one covers which traits a consumer can see.
+type directly ([y-scope/clp#2001](https://github.com/y-scope/clp/pull/2001#discussion_r2823380637)).
+See also: pr-review.md § Trait surface minimization. That rule covers which methods a trait has, and
+this one covers which traits a consumer can see.
 
-**Sources.** y-scope/clp#2001, y-scope/spider#286, y-scope/spider#339, spider
-components/spider-storage/src/db/protocol.rs, clp
-components/log-ingestor/src/ingestion_job/sqs_listener.rs, clp
-components/log-ingestor/src/ingestion_job/state.rs
+**Sources.**
+
+- [y-scope/clp#2001](https://github.com/y-scope/clp/pull/2001#discussion_r2820703495): reviewer questions `IngestionJobState: SqsListenerState + S3ScannerState`
+- [y-scope/clp#2001](https://github.com/y-scope/clp/pull/2001#discussion_r2823380637): author narrows the bound per job; server-side manager keeps a concrete state
+- [y-scope/spider#286](https://github.com/y-scope/spider/pull/286#discussion_r2943798775): bound each use on only the traits it needs; call as `Trait::method`
+- [y-scope/spider#339](https://github.com/y-scope/spider/pull/339#discussion_r3383142317): reviewer rejects mutating through a reader and asks for a dedicated API
+- [y-scope/spider#339](https://github.com/y-scope/spider/pull/339#discussion_r3383447442): author says the shortcut came from iterating with a coding agent
+- [spider `spider-storage/src/db/protocol.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/protocol.rs#L131-L147): `DbStorage` aggregate supertrait over the role traits
+- [clp `log-ingestor/src/ingestion_job/sqs_listener.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/log-ingestor/src/ingestion_job/sqs_listener.rs#L283-L293): `SqsListener` bounded on `IngestionJobState + SqsListenerState`
+- [clp `log-ingestor/src/ingestion_job/state.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/log-ingestor/src/ingestion_job/state.rs#L5-L89): job-agnostic `IngestionJobState` plus per-job-type role traits
 
 ## TLC-3: Keep a statically known type as an associated type; don't erase it and recover it with `unreachable!`
 
@@ -1005,12 +1118,13 @@ associated type (`type Manifest;`, `type Response;`) so callers keep it. Convert
 enum only at the boundary that actually needs the enum. In production code, treat `unreachable!` and
 `let Enum::Variant(x) = y else { panic!(..) }` as signs that the type was erased too early.
 
-**Why.** In y-scope/clp#2620, `Source::build_task_inputs` returned `Vec<CompressionInputSource>`
-even though each source statically knew which manifest it built: `S3Config` only ever built
-`S3InputSource`. That forced the S3 path to match its way back out with an `unreachable!`, and left
-enum accessors whose only callers were tests. An untyped API such as
-`get(path) -> serde_json::Value` fails the same way, because every caller has to guess the schema.
-With an associated type, a mismatch is a compile error and the decoding lives in one implementation.
+**Why.** In [y-scope/clp#2620](https://github.com/y-scope/clp/pull/2620#discussion_r4402879713),
+`Source::build_task_inputs` returned `Vec<CompressionInputSource>` even though each source
+statically knew which manifest it built: `S3Config` only ever built `S3InputSource`. That forced the
+S3 path to match its way back out with an `unreachable!`, and left enum accessors whose only callers
+were tests. An untyped API such as `get(path) -> serde_json::Value` fails the same way, because
+every caller has to guess the schema. With an associated type, a mismatch is a compile error and the
+decoding lives in one implementation.
 
 ```rust,ignore
 // Bad
@@ -1049,26 +1163,32 @@ let input = CompressionInputSource::from(manifest);
 **Exceptions.** When the set of requests is chosen at runtime (for example from config), wrap the
 typed requests in an enum so that each arm keeps its static type.
 
-**Sources.** y-scope/clp#2620, clp components/compression-coordinator/src/partition.rs, RustTraining
-type-driven-correctness-book/src/ch02-typed-command-interfaces-request-determi.md, RustTraining
-rust-patterns-book/src/ch02-traits-in-depth.md
+**Sources.**
+
+- [y-scope/clp#2620](https://github.com/y-scope/clp/pull/2620#discussion_r4402879713): reviewer asks for an associated `Manifest` type to remove the `unreachable!`
+- [clp `compression-coordinator/src/partition.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/compression-coordinator/src/partition.rs#L14-L49): `Source` trait with an associated `Manifest` type
+- [RustTraining type-driven-correctness-book § The command trait (type-indexed dispatch)](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch02-typed-command-interfaces-request-determi.html#step-2--the-command-trait-type-indexed-dispatch): associated `Response` binds each command to its return type
+- [RustTraining rust-patterns-book § Typed Commands — GADT-Style Return Type Safety](https://microsoft.github.io/RustTraining/rust-patterns-book/ch02-traits-in-depth.html#typed-commands--gadt-style-return-type-safety): replaces an untyped `Vec<u8>` API with per-command response types
 
 ## TLC-4: Make a permit or proof a move-only token that only its owning module can mint
 
 **Rule.** When a value grants the right to do something at most once, or proves a precondition
 (authenticated, slot reserved, subsystem ready), make it a struct with private fields and a
 module-private constructor. Don't derive `Clone`, `Copy`, `Default` or `Deserialize` on it. Put the
-spending operation on the token itself, as a synchronous method that takes `self`. Don't express
-such a fact as a `bool` parameter, or as a method on a handle that many holders share.
+spending operation on the token itself, as a method that takes `self`; it may be sync or async.
+Don't express such a fact as a `bool` parameter, or as a method on a handle that many holders share.
 
-**Why.** An earlier revision of y-scope/spider#449 put the spend on the dispatch-queue reader, so
-any holder of any clone of the reader could decrement a hint count it had no claim to. Once that
-happens, the counter stays wrong. With a move-only `Hint`, spending twice (E0382) and forging a hint
-(E0451) are both compile errors, so reviewers don't have to audit every call site. A
-`fn reset(is_admin: bool)` has the same problem in another form, because the caller can just pass
-`true`. Each derive and each `pub` field is another way to forge the token. A synchronous spend also
-means that cancellation at an `.await` can't leave the counter decremented without the receive
-happening.
+**Why.** An earlier revision of [y-scope/spider#449](https://github.com/y-scope/spider/pull/449) put
+the spend on the dispatch-queue reader, so any holder of any clone of the reader could decrement a
+hint count it had no claim to. Once that happens, the counter stays wrong. With a move-only `Hint`,
+spending twice (E0382) and forging a hint (E0451) are both compile errors, so reviewers don't have
+to audit every call site. A `fn reset(is_admin: bool)` has the same problem in another form, because
+the caller can just pass `true`. Each derive and each `pub` field is another way to forge the token.
+An `async fn spend(self)` keeps the at-most-once guarantee too: the token moves into the future, so
+dropping the future drops the token, and it can't be spent again. What cancellation can still break
+is atomicity: if the spend updates the accounting and then awaits, a drop at that `.await` leaves
+the count decremented without the work happening. Spider's `Hint` spend is synchronous because
+both of its steps are; an async spend must be cancel-safe (ASYNC-1, ASYNC-2).
 
 ```rust,ignore
 // Bad
@@ -1105,6 +1225,8 @@ impl Hint {
 - Flag `bool` parameters that assert a security or readiness fact, and ask for a `&Token` parameter
   instead. If the token must not be replayed against a different resource, make it borrow that
   resource (`Token<'session_lifetime>`), or make the guarded operation a method on the resource.
+- For an async spend, flag accounting applied before an `.await` that can be cancelled. Ask to move
+  it after the last such `.await`, or to run the spend where the caller can't cancel it (ASYNC-2).
 
 **Exceptions.** A `bool` for a plain binary choice is still right (coding-style.md § Prefer Booleans
 Over Small Enum Subsets). Dropping an unspent token is fine and needs no `Drop` impl, unless
@@ -1113,67 +1235,14 @@ Take ownership when the value mustn't be used afterwards. This rule adds the pri
 the forbidden derives, and moving the spend off the shared handle. OBJ-10 covers derives in general,
 and TEST-10 covers pinning the guarantee with a compile-fail test.
 
-**Sources.** y-scope/spider#449, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs, RustTraining
-type-driven-correctness-book/src/ch04-capability-tokens-zero-cost-proof-of-aut.md, RustTraining
-type-driven-correctness-book/src/ch13-reference-card.md
+**Sources.**
 
-## TLC-5: Assert `Send`/`Sync` guarantees at compile time, next to the type
+- [y-scope/spider#449](https://github.com/y-scope/spider/pull/449): description explains the module-private, non-`Clone` `Hint` and the earlier reader-side spend
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs#L419-L484): `Hint` with a private constructor and a synchronous consuming spend
+- [RustTraining type-driven-correctness-book § Zero-Sized Types as Proof Tokens](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch04-capability-tokens-zero-cost-proof-of-aut.html#zero-sized-types-as-proof-tokens): private-field tokens that only the owning module can mint
+- [RustTraining type-driven-correctness-book § Anti-Patterns to Avoid](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch13-reference-card.html#anti-patterns-to-avoid): `is_admin: bool` and `Clone` on single-use values
 
-**Rule.** When a public handle or its async methods must be usable from `tokio::spawn`, assert it at
-compile time in the defining module. Use a `const _: () = { .. }` block for the type, and a
-never-called `#[expect(dead_code)]` function with one assertion per public async method for the
-returned futures. In a trait whose futures get spawned, put `Send` in the trait itself.
-
-**Why.** If someone holds an `Rc` or a non-`Send` guard across an `.await`, the future silently
-becomes `!Send`. The library still compiles, and the error shows up only in a downstream crate's
-`tokio::spawn`, far from the cause. Asserting only the handle type doesn't catch this, because the
-handle stays `Send + Sync` while one of its futures stops being `Send`. A native `async fn` in a
-trait promises no `Send` either, so one implementation can break every generic caller with "future
-cannot be sent between threads safely". rustc's `async_fn_in_trait` lint already warns about this on
-`pub` traits, so fix the signature rather than allowing the lint. Traits using `#[async_trait]`
-(without `?Send`) already box `Send` futures. Native traits need
-`-> impl Future<Output = ..> + Send`, and implementations may still write `async fn`.
-
-```rust
-// Bad
-pub trait Store {
-    async fn get(&self, key: &str) -> Option<String>;
-}
-```
-
-```rust,ignore
-// Good
-pub trait Store: Send + Sync {
-    fn get(&self, key: &str) -> impl Future<Output = Option<String>> + Send;
-}
-
-const _: () = {
-    const fn assert_send_sync<CheckedType: Send + Sync>() {}
-    assert_send_sync::<SpiderClient>();
-};
-
-#[expect(dead_code, reason = "compile-time-only `Send` assertion; never called")]
-fn assert_client_futures_send(client: &SpiderClient, job_id: JobId) {
-    const fn assert_send<FutureType: Send>(_: &FutureType) {}
-    assert_send(&client.start_job(job_id));
-    assert_send(&client.cancel_job(job_id));
-}
-```
-
-**Review.**
-- Flag a new public client or handle type without a `Send + Sync` assertion, and a new public async
-  method on it that isn't added to the futures assertion.
-- Flag a native `async fn` in a trait whose futures are spawned or held across tasks, and any
-  `#[allow(async_fn_in_trait)]`.
-
-**Exceptions.** Types that never leave one task or thread don't need the assertion.
-
-**Sources.** See also ASYNC-10 (designing async APIs around laziness and `Send`) and OWN-4 (`Send`
-futures from closures). spider components/spider-client/src/client.rs, RustTraining
-async-book/src/ch10-async-traits.md
-
-## TLC-6: Use associated types for types each implementor fixes, and `Infallible` for impls that can't fail
+## TLC-5: Use associated types for types each implementor fixes, and `Infallible` for impls that can't fail
 
 **Rule.** Use an associated type when each implementor fixes exactly one related type (`Error`,
 `Batch`, `Item`, `Response`). Use a trait generic parameter only when one type legitimately
@@ -1181,31 +1250,52 @@ implements the trait several times (`From<SourceType>`). Give a trait that has s
 different failures `type Error: std::error::Error + Send + Sync + 'static`, and set `type Error =
 Infallible` in an implementation that can't fail.
 
-**Why.** A generic parameter where an associated type belongs allows conflicting impls, makes
-callers annotate the type at the call site (`let message: Message = decoder.decode(raw)?`), and
-turns bounds into `StorageType: Storage<ErrorType>, ErrorType: Error`. A single shared error enum
-forces every backend's variants onto all backends. A made-up `String` error on an infallible test
-double suggests failure paths that don't exist, while `Infallible` keeps `?` working in generic
-code. The same trick compiles optional machinery out cleanly. Spider's disarmed test hooks return an
+**Why.** A generic parameter says "this type may implement the trait many times". An encoder
+produces one kind of batch and fails in one way, but `ResultEncoder<BatchType, ErrorType>` doesn't
+say so. Every generic caller carries the extra parameters (`open<EncoderType, BatchType,
+ErrorType>`), and nothing stops a second impl for the same encoder. Once one exists, every call that
+relied on inference stops compiling with E0283 ("type annotations needed"). With associated types,
+the batch and error belong to the encoder, so generic code names only `EncoderType` and reads
+`EncoderType::Error`. A single shared error enum forces every backend's variants onto all backends.
+A made-up `String` error on an infallible impl suggests failure paths that don't exist, and it
+doesn't even satisfy a `std::error::Error` bound. `Infallible` does, and keeps `?` working in
+generic code. The same trick compiles optional machinery out cleanly. Spider's disarmed test hooks return an
 empty `enum InjectedFault {}` whose `From` impl is `match fault {}`, so the call sites are identical
 in both builds and need no `#[cfg]`.
 
 ```rust,ignore
 // Bad
-trait Decoder<OutputType> {
-    fn decode(&self, raw: &[u8]) -> Result<OutputType, DecodeError>;
+pub trait ResultEncoder<BatchType, ErrorType>: Sized {
+    fn new(archive_id: ArchiveId) -> Result<Self, ErrorType>;
+    fn take_batch(&mut self) -> BatchType;
 }
 
-let message: Message = decoder.decode(raw)?;
+impl ResultEncoder<Vec<QueryResult>, String> for QueryResultEncoder {
+    fn new(archive_id: ArchiveId) -> Result<Self, String> {
+        Ok(Self { archive_id, batch: Vec::new() })
+    }
+
+    fn take_batch(&mut self) -> Vec<QueryResult> {
+        std::mem::take(&mut self.batch)
+    }
+}
+
+fn open<EncoderType, BatchType, ErrorType>(archive_id: ArchiveId) -> Result<EncoderType, ErrorType>
+where
+    EncoderType: ResultEncoder<BatchType, ErrorType>,
+{
+    EncoderType::new(archive_id)
+}
 ```
 
 ```rust,ignore
 // Good
-pub trait ResultEncoder: Send + Sized + 'static {
+pub trait ResultEncoder: Sized {
     type Batch: Send + 'static;
     type Error: std::error::Error + Send + Sync + 'static;
 
     fn new(archive_id: ArchiveId) -> Result<Self, Self::Error>;
+    fn take_batch(&mut self) -> Self::Batch;
 }
 
 impl ResultEncoder for QueryResultEncoder {
@@ -1215,6 +1305,16 @@ impl ResultEncoder for QueryResultEncoder {
     fn new(archive_id: ArchiveId) -> Result<Self, Infallible> {
         Ok(Self { archive_id, batch: Vec::new() })
     }
+
+    fn take_batch(&mut self) -> Vec<QueryResult> {
+        std::mem::take(&mut self.batch)
+    }
+}
+
+fn open<EncoderType: ResultEncoder>(
+    archive_id: ArchiveId,
+) -> Result<EncoderType, EncoderType::Error> {
+    EncoderType::new(archive_id)
 }
 ```
 
@@ -1228,14 +1328,17 @@ impl ResultEncoder for QueryResultEncoder {
 **Exceptions.** A trait with one production backend plus test doubles (such as spider's storage
 traits returning `DbError`) may keep a concrete error type.
 
-**Sources.** See also ERR-10 (when a trait method needs an associated `Error` at all). clp
-components/clp-rust-libs/query-result-listener/src/encoding.rs, clp
-components/clp-rust-libs/query-result-listener/src/test_utils.rs, spider
-components/spider-storage/src/test_hooks/disarmed.rs, RustTraining
-rust-patterns-book/src/ch02-traits-in-depth.md, RustTraining
-rust-patterns-book/src/ch17-exercises.md
+See also: ERR-10 (when a trait method needs an associated `Error` at all).
 
-## TLC-7: Make a stateless strategy a type-only trait
+**Sources.**
+
+- [clp `clp-rust-libs/query-result-listener/src/encoding.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/encoding.rs#L21-L67): `ResultEncoder` with associated `Batch` and a bounded associated `Error`
+- [clp `clp-rust-libs/query-result-listener/src/test_utils.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/test_utils.rs#L47-L85): test encoding and encoder set `type Error = Infallible`
+- [spider `spider-storage/src/test_hooks/disarmed.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/test_hooks/disarmed.rs#L9-L20): empty `InjectedFault` enum whose `From` impl is `match fault {}`
+- [RustTraining rust-patterns-book § Associated Types vs Generic Parameters](https://microsoft.github.io/RustTraining/rust-patterns-book/ch02-traits-in-depth.html#associated-types-vs-generic-parameters): one impl per type versus several impls per type
+- [RustTraining rust-patterns-book § Exercise 6: Generic Trait with Associated Types](https://microsoft.github.io/RustTraining/rust-patterns-book/ch17-exercises.html#exercise-6-generic-trait-with-associated-types--40-min): associated `Error` set to `Infallible` for an in-memory store
+
+## TLC-6: Make a stateless strategy a type-only trait
 
 **Rule.** If a strategy carries no state, don't make callers construct and store a value of it.
 Express it only through associated types, and put construction on the per-instance type as an
@@ -1244,9 +1347,10 @@ instantiated, make it an empty enum.
 
 **Why.** A field holding a zero-sized strategy suggests that the strategy has state and that two
 instances might differ. A factory method taking `&self` invites implementations to hide state there.
-In y-scope/clp#2676 the reviewer put it this way: "it's not a variable, it should be just a type
-constraint". y-scope/clp#2682 then moved creation into `ResultEncoder::new` and turned `SseEncoding`
-and the test encodings into empty enums.
+In [y-scope/clp#2676](https://github.com/y-scope/clp/pull/2676#discussion_r4488138722) the reviewer
+put it this way: "it's not a variable, it should be just a type constraint".
+[y-scope/clp#2682](https://github.com/y-scope/clp/pull/2682) then moved creation into
+`ResultEncoder::new` and turned `SseEncoding` and the test encodings into empty enums.
 
 ```rust,ignore
 // Bad
@@ -1277,81 +1381,59 @@ let encoder = EncodingType::Encoder::new(archive_id)?;
 - Flag struct fields whose type is a stateless strategy, and `&self` factory methods that ignore
   `self`. Ask for associated types plus an associated constructor on the product type.
 
-**Sources.** y-scope/clp#2676, y-scope/clp#2682, clp
-components/clp-rust-libs/query-result-listener/src/encoding.rs, clp components/api-server/src/sse.rs
+**Sources.**
 
-## TLC-8: When `dyn` is justified, make the trait dyn-compatible from the start
+- [y-scope/clp#2676](https://github.com/y-scope/clp/pull/2676#discussion_r4488138722): reviewer: the encoding is not a variable, just a type constraint
+- [y-scope/clp#2682](https://github.com/y-scope/clp/pull/2682): moves encoder creation into `ResultEncoder::new`; encodings become empty enums
+- [clp `clp-rust-libs/query-result-listener/src/encoding.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/encoding.rs#L5-L19): type-only `ResultEncoding` with `Batch`, `Error` and `Encoder`
+- [clp `api-server/src/sse.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/api-server/src/sse.rs#L8-L53): `SseEncoding` as an empty enum, with its `SseEncoder`
 
-**Rule.** Once a trait object is justified, make the trait dyn-compatible (formerly "object-safe")
-from the start. Consuming methods take `self: Box<Self>`. There is no `Sized` supertrait such as
-`Clone`: share the object as `Arc<dyn Trait>` instead. There are no generic methods: make the
-collaborator type an associated type. When the implementations are rich typed values that must be
-stored and dispatched uniformly (user-authored tasks looked up by name), split the design into three
-parts: a typed authoring trait, a small erased `Send + Sync` trait, and one generic bridge that
-implements the erased trait.
+## TLC-7: Take `self: Box<Self>` in consuming methods called through a trait object
 
-**Why.** A by-value `self` method compiles, but it can't be called through `Box<dyn Trait>` (E0161).
-y-scope/spider#368 changed `SchedulerCore::run` to `self: Box<Self>` for this reason. A `Clone`
-supertrait makes the trait unusable as `dyn` (E0038), so the type ends up as a generic parameter
-through every layer. y-scope/spider#443 replaced `DispatchQueueSink: Send + Sync + Clone` with one
-`Arc<dyn DispatchQueueHandle>`. Associated types and consts make spider-tdl's `Task` (`type Params;
-type Return; const NAME; fn execute`) unusable as `dyn`, so `TaskHandler` deals in bytes and
-`TaskHandlerImpl<TaskType>` holds all the (de)serialization. Its `PhantomData<fn() -> TaskType>`
-keeps the bridge `Send + Sync` without requiring that of the task type. Downcasting a `Box<dyn Any>`
-instead brings back the silent runtime misses that an enum prevents.
+**Rule.** If a method consumes `self` and is meant to be called on a trait object
+(`Box<dyn Trait>`), declare it `self: Box<Self>`, not `self`.
+
+**Why.** A by-value `self` can't be moved out of a `dyn Trait`, whose size is unknown, so the call
+fails with E0161. The trait and the `Box<dyn Trait>` type still compile, so the mistake shows up
+only at the first call, often in another crate.
+[y-scope/spider#368](https://github.com/y-scope/spider/pull/368) changed `SchedulerCore::run` to
+`self: Box<Self>` for this reason.
 
 ```rust,ignore
 // Bad
 #[async_trait]
-pub trait SchedulerCore: Send + Clone {
+pub trait SchedulerCore: Send {
     async fn run(self, cancellation_token: CancellationToken) -> Result<(), SchedulerError>;
 }
+
+core.run(cancellation_token).await?; // `core: Box<dyn SchedulerCore>`: E0161
 ```
 
 ```rust,ignore
 // Good
 #[async_trait]
 pub trait SchedulerCore: Send {
-    type StorageClient: SchedulerStorageClient;
-
-    async fn run(
-        self: Box<Self>,
-        storage_client: Self::StorageClient,
-        cancellation_token: CancellationToken,
-    ) -> Result<(), SchedulerError>;
+    async fn run(self: Box<Self>, cancellation_token: CancellationToken)
+        -> Result<(), SchedulerError>;
 }
 
-pub trait TaskHandler: Send + Sync {
-    fn execute_raw(&self, raw_params: &[u8]) -> Result<Vec<u8>, TaskError>;
-}
-
-pub struct TaskHandlerImpl<TaskType: Task> {
-    _marker: PhantomData<fn() -> TaskType>,
-}
-
-impl<TaskType: Task> TaskHandler for TaskHandlerImpl<TaskType> {
-    fn execute_raw(&self, raw_params: &[u8]) -> Result<Vec<u8>, TaskError> {
-        let params = rmp_serde::from_slice(raw_params)?;
-        Ok(rmp_serde::to_vec(&TaskType::execute(params)?)?)
-    }
-}
+core.run(cancellation_token).await?;
 ```
 
 **Review.**
-- Flag a trait used as `dyn` that has a `Clone`/`Sized` supertrait, a by-value `self` method, a
-  generic method, or `-> Self` without `where Self: Sized`.
-- Flag `Vec<Box<dyn Any>>` plus `downcast_ref`. Ask for an enum, separate typed collections, or the
-  erased-trait bridge.
+- Flag a by-value `self` method on a trait that is used, or meant to be used, as `dyn`. Ask for
+  `self: Box<Self>`, or for `where Self: Sized` if the method is only for concrete types.
 
-**Exceptions.** This rule only covers how to build the trait once `dyn` is chosen. Whether to choose
-it follows coding-style.md § Enum vs Trait Objects: when the set of types is known at compile time,
-use an enum.
+**Exceptions.** Whether to use a trait object at all follows coding-style.md § Enum vs Trait
+Objects: when the set of types is known at compile time, use an enum.
 
-**Sources.** y-scope/spider#368, y-scope/spider#443, spider components/spider-scheduler/src/core.rs,
-spider components/spider-tdl/src/task.rs, RustTraining
-rust-patterns-book/src/ch02-traits-in-depth.md, RustTraining c-cpp-book/src/ch16-case-studies.md
+**Sources.**
 
-## TLC-9: Use blanket impls only for behavior that is the same for every type: extension traits and smart-pointer forwarding
+- [y-scope/spider#368](https://github.com/y-scope/spider/pull/368): changes `SchedulerCore::run` to `self: Box<Self>` for `Box<dyn SchedulerCore>`
+- [spider `spider-scheduler/src/core.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core.rs#L39-L86): `SchedulerCore::run` takes `self: Box<Self>`
+- [RustTraining rust-patterns-book § Dyn Compatibility (formerly "Object Safety")](https://microsoft.github.io/RustTraining/rust-patterns-book/ch02-traits-in-depth.html#dyn-compatibility-formerly-object-safety): the conditions a trait must meet to be used as `dyn`
+
+## TLC-8: Use blanket impls only for behavior that is the same for every type: extension traits and smart-pointer forwarding
 
 **Rule.** Write `impl<SomeType: Bound> Trait for SomeType` only when every type that meets the bound
 should get the same behavior forever. Two cases qualify. The first is an extension trait whose
@@ -1360,12 +1442,12 @@ impl such as `impl<ClientType: Client + ?Sized> Client for Arc<ClientType>`, sho
 Otherwise, write inherent methods or per-type impls.
 
 **Why.** Copies of `from_yaml_file`, each with its own per-crate `ConfigError`, drifted apart.
-y-scope/spider#362 replaced them with one `YamlConfig` trait and a blanket impl over
-`DeserializeOwned`. A forwarding `Arc` impl lets generic code keep requiring `Trait + Clone`, and
-lets a test hand an `Arc<Mock>` to an actor while keeping a handle to inspect it. The `?Sized` bound
-is what makes `Arc<dyn Trait>` work. Blanket impls are hard to undo, though: coherence forbids a
-more specific impl for any type the blanket impl already covers (E0119), and adding a blanket impl
-to a published trait is a breaking change.
+[y-scope/spider#362](https://github.com/y-scope/spider/pull/362) replaced them with one `YamlConfig`
+trait and a blanket impl over `DeserializeOwned`. A forwarding `Arc` impl lets generic code keep
+requiring `Trait + Clone`, and lets a test hand an `Arc<Mock>` to an actor while keeping a handle to
+inspect it. The `?Sized` bound is what makes `Arc<dyn Trait>` work. Blanket impls are hard to undo,
+though: coherence forbids a more specific impl for any type the blanket impl already covers (E0119),
+and adding a blanket impl to a published trait is a breaking change.
 
 ```rust,compile_fail
 // Bad
@@ -1413,12 +1495,15 @@ impl<ConfigType: DeserializeOwned> YamlConfig for ConfigType {}
 **Exceptions.** For behavior that only your own types have, add inherent methods. Extension traits
 need an import, which makes their methods harder to find.
 
-**Sources.** y-scope/spider#362, spider components/spider-utils/src/config.rs, spider
-components/spider-execution-manager/src/client/liveness.rs, RustTraining
-rust-patterns-book/src/ch02-traits-in-depth.md, RustTraining
-type-driven-correctness-book/src/ch08-capability-mixins-compile-time-hardware-.md
+**Sources.**
 
-## TLC-10: Use typestate only for statically ordered protocols, and keep state data inside the state
+- [y-scope/spider#362](https://github.com/y-scope/spider/pull/362): adds `YamlConfig` with a blanket impl, and a forwarding `Arc` impl
+- [spider `spider-utils/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/config.rs#L23-L47): `YamlConfig` extension trait with a blanket impl over `DeserializeOwned`
+- [spider `spider-execution-manager/src/client/liveness.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/liveness.rs#L99-L115): forwarding `LivenessClient` impl for `Arc<LivenessClientType>` with `?Sized`
+- [RustTraining rust-patterns-book § Blanket Implementations](https://microsoft.github.io/RustTraining/rust-patterns-book/ch02-traits-in-depth.html#blanket-implementations): blanket impls are irreversible because of coherence
+- [RustTraining type-driven-correctness-book § Mixin Traits (Diagnostic Behaviors)](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch08-capability-mixins-compile-time-hardware-.html#mixin-traits-diagnostic-behaviors): blanket impls give behavior to every type with the capabilities
+
+## TLC-9: Use typestate only for statically ordered protocols, and keep state data inside the state
 
 **Rule.** When an object goes through three or more phases whose order is known at compile time and
 which allow different operations, make it `Thing<StateType>`. Put each phase's operations in its own
@@ -1434,8 +1519,10 @@ runtime check back: the book's own `IpmiSession<State>` keeps `session_id: Optio
 `.unwrap()` under a "guaranteed Some" comment in every `Active` method. When a transition can fail
 in a recoverable way, hand the old state back (`Result<Next, (Error, Self)>`). Otherwise one failed
 `.await` throws the connection away. Typestate has costs too: spider deliberately kept a single
-`TaskContext` for all task kinds (y-scope/spider#390), and documented rather than typed an
-internal-only invariant (y-scope/spider#408).
+`TaskContext` for all task kinds
+([y-scope/spider#390](https://github.com/y-scope/spider/pull/390#issuecomment-4953671655)), and
+documented rather than typed an internal-only invariant
+([y-scope/spider#408](https://github.com/y-scope/spider/pull/408#issuecomment-5013945738)).
 
 ```rust,ignore
 // Bad
@@ -1494,11 +1581,13 @@ See also: coding-style.md § Take ownership when the value mustn't be used after
 coding-style.md § Type-Level Validation for the two-phase raw → validated case, OBJ-7 for typestate
 builders, and TEST-10 for pinning the guarantee with a compile-fail test.
 
-**Sources.** RustTraining
-type-driven-correctness-book/src/ch05-protocol-state-machines-type-state-for-r.md, RustTraining
-type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md, RustTraining
-type-driven-correctness-book/src/ch01-the-philosophy-why-types-beat-tests.md, y-scope/spider#390,
-y-scope/spider#408
+**Sources.**
+
+- [RustTraining type-driven-correctness-book § Type-State Pattern](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch05-protocol-state-machines-type-state-for-r.html#type-state-pattern): `IpmiSession<State>`, including the shared `Option` field and `.unwrap()` calls
+- [RustTraining type-driven-correctness-book § Async Type-State Machines](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-8--async-type-state-machines): consuming transitions that hand back the previous state on error
+- [RustTraining type-driven-correctness-book § When NOT to Use These Patterns](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch01-the-philosophy-why-types-beat-tests.html#when-not-to-use-these-patterns): `assert!` suffices for prototypes and small internal helpers
+- [y-scope/spider#390](https://github.com/y-scope/spider/pull/390#issuecomment-4953671655): keep one `TaskContext` type for all task kinds, for user ergonomics
+- [y-scope/spider#408](https://github.com/y-scope/spider/pull/408#issuecomment-5013945738): internal-only invariant documented rather than encoded in the type system
 
 # Defensive programming
 
@@ -1509,76 +1598,7 @@ can't, and make any remaining violation loud and attributable rather than quiet 
 matters most in long-running services like ours, where a silently wrong value or a stray panic in a
 coordinator costs far more than an error returned to one caller.
 
-## DEF-1: Match every variant of the enums you own; no catch-all arm
-
-**Rule.** In a `match` over an enum defined in the workspace, list every variant, grouping them with
-`|` where they share a body, and never end with `_ =>`. Use `_` only for open domains (integers,
-strings) and foreign `#[non_exhaustive]` enums, and there the fallback must be the conservative
-outcome (an error, "not retriable", `INTERNAL`), never success.
-
-**Why.** An exhaustive match turns "someone added a variant" into a compile error at every place
-that has to decide what the variant means, and a `_` arm sends it to whatever the default was
-instead. Spider keeps hitting this. `StaleStateError::JobAlreadyStarted` fell through a `_` in the
-gRPC error mapping and reached clients as `INTERNAL`, which stopped them re-attaching to a running
-job after a restart (y-scope/spider#509). The execution manager's task-registration match ends in
-`_ =>`, so `StorageResponseError::Transport`, documented as "callers may back off and retry", takes
-the fatal bail-out path, and a brief storage blip stops the execution manager. A precondition check
-in the job tree ends in `_ => Ok(())`, so it accepts any job state added later. `matches!`
-classifications have the same hole, because they keep compiling when a variant is added: adding
-`BlockingOnChildren` meant finding `ensure_commit_ready` by hand (y-scope/spider#531).
-
-```rust,ignore
-// Bad
-match &err {
-    StorageResponseError::StaleSession(_) | StorageResponseError::CacheStale(_) => Ok(None),
-    _ => Err(RuntimeError::StorageResponse(err)), // retryable `Transport` lands here
-}
-```
-
-```rust,ignore
-// Good
-match &err {
-    StorageResponseError::StaleSession(_) | StorageResponseError::CacheStale(_) => Ok(None),
-    StorageResponseError::Transport(_) => {
-        tokio::time::sleep(backoff(retry, MAX_BACKOFF)).await;
-        Ok(None)
-    }
-    StorageResponseError::Server(_) | StorageResponseError::InvalidInput(_) => {
-        Err(RuntimeError::StorageResponse(err))
-    }
-}
-```
-
-**Review.**
-- Flag `_ =>` (and unused `other =>` bindings) in a match over a workspace enum, and ask for the
-  variants to be listed. Look hardest at state-transition tables (`is_valid_transition` should match
-  the target state exhaustively), error-to-status-code mappings (ERR-6), and retry-or-fatal
-  classifications.
-- When a PR adds a variant, grep for `matches!(` and `is_*()` predicates that mention its siblings
-  (e.g. `ensure_commit_ready`), since the compiler won't flag them, and check each one. A `matches!`
-  that checks a single variant's identity (`is_running`) is fine. One that encodes a classification
-  ("is ready to commit") should be an exhaustive `match`.
-- Flag `#[non_exhaustive]` on an enum that other crates in the workspace match on: it forces those
-  crates to add the `_` arm this rule forbids (see MOD-2). When code consumes a struct field by
-  field (a `From` impl, a mapping to a proto), ask for a full destructure with `field: _` for
-  ignored fields, so that adding a field also breaks the build.
-
-**Exceptions.** Open domains (integers, strings), and foreign or `#[non_exhaustive]` enums such as
-`tonic::Code`, where the wildcard must pick the safe default (ERR-8 covers `From` impls for foreign
-enums).
-
-See also: coding-style.md § Enum vs Trait Objects (exhaustiveness is the reason that section
-exists), TYPE-6 (parsing closed sets into enums).
-
-**Sources.** y-scope/spider#509, y-scope/spider#480, y-scope/spider#524, y-scope/spider#531, spider
-components/spider-execution-manager/src/runtime.rs, spider
-components/spider-execution-manager/src/client/storage.rs, spider
-components/spider-storage/src/cache/tree/event.rs, spider
-components/spider-storage/src/cache/job.rs, spider components/spider-core/src/job.rs, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md, RustTraining
-csharp-book/src/ch01-introduction-and-motivation.md
-
-## DEF-2: Run every check that can fail before the first mutation
+## DEF-1: Run every check that can fail before the first mutation
 
 **Rule.** In a function that changes state (memory, DB, a queue, a file) and can fail, do all
 validation, lookups, size checks and config checks first, computing new values into locals, and only
@@ -1639,398 +1659,72 @@ See also: coding-style.md § Type-Level Validation (where the validated-config t
 Take ownership when the value mustn't be used afterwards (for the guard's `disarm(self)`), and OBJ-7
 (a builder's `add` validates before it changes state).
 
-**Sources.** y-scope/spider#554, y-scope/spider#560, y-scope/spider#290, y-scope/clp#2150, spider
-components/spider-core/src/task/task_graph.rs, spider components/spider-storage/src/cache/task.rs,
-spider components/spider-storage/src/partial_mutation.rs, spider
-components/spider-storage/src/task_instance_pool.rs, RustTraining
-c-cpp-book/src/ch18-cpp-rust-semantic-deep-dives.md
+**Sources.**
 
-## DEF-3: Make check-then-act atomic, and let progress state only move forward
+- [y-scope/spider#554](https://github.com/y-scope/spider/pull/554): `PartialMutationGuard`; output count is now checked before marking success
+- [y-scope/spider#560](https://github.com/y-scope/spider/pull/560): the outputs-size check runs before the report touches the task
+- [y-scope/spider#290](https://github.com/y-scope/spider/pull/290): adds the task control block whose success path a later PR reorders
+- [y-scope/clp#2150](https://github.com/y-scope/clp/pull/2150#pullrequestreview-4039460381): `channel_capacity` 0 panicked after the job row was inserted, on every restart
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L693-L737): `TaskGraph::compute_and_update_dependencies_from_inputs` validates, then `expect`s while mutating
+- [spider `spider-storage/src/cache/task.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/task.rs#L455-L518): `SharedTaskControlBlock::succeed_task_instance` checks the output count before the first mutation
+- [spider `spider-storage/src/partial_mutation.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/partial_mutation.rs#L16-L95): `PartialMutationGuard`: fatal on drop, disarmed by `disarm(self)`
+- [spider `spider-storage/src/task_instance_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/task_instance_pool.rs#L503-L544): `create_task_instance_pool` validates its config before creating the channel and spawning
+- [RustTraining c-cpp-book § Exception Safety → Panic Safety](https://microsoft.github.io/RustTraining/c-cpp-book/ch18-cpp-rust-semantic-deep-dives.html#exception-safety--panic-safety): `?` before the single commit gives the strong guarantee
 
-**Rule.** A state check and the mutation it guards happen in one atomic step: `entry()` on maps, a
-single `compare_exchange`, `fetch_update` or `fetch_max` on atomics, and in the DB either
-`SELECT ... FOR UPDATE` in the same transaction or a guarded `UPDATE ... WHERE state = ?` whose
-`rows_affected` is checked against the expected count (BND-3 covers the SQL forms). Never write a
-persisted status unconditionally, not even to mark something failed. Epochs, session IDs and cursors
-only move forward: expose `try_advance`, not `set`, and drop stale-epoch work at every point where
-work is consumed.
+## DEF-2: Make check-then-act one atomic step
 
-**Why.** Between a check and a separate write, another task, another process or a restarted
-coordinator can change the state. In clp, marking a query job failed "regardless of its current
-status" could overwrite a terminal `Cancelled` set by the API server. A `contains_key` followed by a
-separate `insert` on the session map would have let one session silently overwrite another. Progress
-state that can go backwards is the same bug over time: the S3 scanner overwrote its cursor with
-`None` after an empty scan and re-ingested the same object 286 times (y-scope/clp#2333). Spider
-stamps every assignment with a session ID that only advances through a CAS, and drops stale
-assignments at dequeue, hint redemption, reschedule drain and completion.
+**Rule.** When shared state is checked and then changed based on the result, do both in one atomic
+operation: `entry()` on a concurrent map such as `DashMap`, a single `compare_exchange`,
+`fetch_update` or `fetch_max` on an atomic, or one lock guard held across the check and the write.
+BND-3 covers the same race in the database.
+
+**Why.** Between a check and a separate write, another task can change the state, and the write then
+acts on a check that no longer holds. On a `DashMap`, each call such as `contains_key` or `insert`
+takes and releases its shard lock on its own. Two `open` calls can both see a token as free, and the
+second silently replaces the first session. `entry()` holds the shard lock across both steps, which
+is how clp's session registry registers tokens
+([y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689)). Clippy doesn't catch this:
+`clippy::map_entry` only flags the std `HashMap`/`BTreeMap` `if !contains_key { insert }` form, as a
+performance lint. It says nothing about `DashMap`, a map behind a lock taken twice, or atomics.
 
 ```rust,ignore
 // Bad
-if sessions.contains_key(&token) {
+let token = SessionToken::generate();
+if self.sessions.contains_key(&token) {
     return Err(SessionError::TokenCollision(token));
 }
-sessions.insert(token, state);
-
-sqlx::query("UPDATE query_jobs SET status = ? WHERE id = ?")
-    .bind(QueryJobStatus::Failed)
-    .bind(id)
-    .execute(&pool)
-    .await?;
-
-self.start_after = scan_prefix(&client, &self.start_after).await?;
+// Another `open` can insert the same token here.
+self.sessions.insert(token, session_state);
 ```
 
 ```rust,ignore
 // Good
-let Entry::Vacant(entry) = sessions.entry(token) else {
+let token = SessionToken::generate();
+let Entry::Vacant(entry) = self.sessions.entry(token) else {
     return Err(SessionError::TokenCollision(token));
 };
-entry.insert(state);
-
-let mut tx = pool.begin().await?;
-let from = lock_and_get_status(&mut tx, id).await?; // `SELECT ... FOR UPDATE`
-if !QueryJobStatus::is_valid_transition(from, QueryJobStatus::Failed) {
-    return Err(Error::InvalidQueryJobStatusTransition { from, to: QueryJobStatus::Failed });
-}
-update_status(&mut tx, id, QueryJobStatus::Failed).await?;
-tx.commit().await?;
-
-if let Some(last_key) = scan_prefix(&client, &self.start_after).await? {
-    self.start_after = Some(last_key);
-}
+entry.insert(session_state);
 ```
 
 **Review.**
-- Flag a `contains_key` or `get` followed by `insert` or `remove`, a `load` followed by `store`, and
-  a status read under one lock or in one statement followed by a write under another. The fix is
-  `entry()`, one CAS, or a locked read in the same transaction. For async locks, see ASYNC-5
+- Flag `contains_key` or `get` followed by `insert` or `remove` on a concurrent map, a `load`
+  followed by `store` on an atomic, and a read under one lock guard followed by a write under
+  another. Ask for `entry()`, one CAS, or one guard held across both. For async locks, see ASYNC-5
   (re-check under the write guard).
-- Flag `UPDATE ... SET status = ?` without a from-state guard, and any guarded write whose
-  `rows_affected` is ignored. A mismatch is a corruption error such as `CorruptedDbState`, not a
-  silent skip. A second "confirmation" `SELECT` that could only disagree if the DB were corrupt adds
-  round trips and locks without adding safety.
-- Flag `self.cursor = <Option-returning fetch>` and any raw `set` or `store` on an epoch. Work that
-  can outlive a reset must carry its epoch and be checked at each consumer, not only once.
 
 **Exceptions.** State owned by a single writer (an actor, a committer) is already atomic where that
 writer checks and acts (ASYNC-9). A caller-side check is fine as long as it is advisory and the
 single writer re-checks the precondition before committing, as Spider's committer does with
 `StateRequirement`.
 
-**Sources.** y-scope/clp#2513, y-scope/clp#2617, y-scope/clp#2689, y-scope/clp#2662,
-y-scope/clp#2333, y-scope/clp#2038, y-scope/spider#373, y-scope/spider#328, spider
-components/spider-core/src/session.rs, spider components/spider-scheduler/src/service.rs, spider
-components/spider-storage/src/cache/job.rs, spider
-components/spider-storage/src/db/mariadb/tree_transition.rs
+**Sources.**
 
-## DEF-4: Turn unknown, missing or unsupported input into an error, never a plausible value
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689): `open_session` registers a fresh token, failing with `TokenCollision` if taken
+- [clp `clp-rust-libs/query-result-listener/src/session/registry.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/registry.rs#L60-L72): `SessionRegistry::open` registers a fresh token through `entry()`
+- [y-scope/clp#2662](https://github.com/y-scope/clp/pull/2662): `TaskCursor::claim` advances the cursor with one compare-and-swap
+- [spider `spider-storage/src/cache/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/job.rs#L860-L895): `submit_event_and_wait_for_reply`: the committer re-checks `StateRequirement`
 
-**Rule.** When an external discriminant is not one you recognise, when a required field is absent,
-or when a request asks for something the component can't honour, return an error variant carrying
-the offending value (`UnknownStatus(u8)`, `UnsupportedJobConfig(..)`). Don't fall back to a
-valid-looking variant, invent a default while parsing, quietly run a degraded version of the
-request, or rewrite malformed input until it passes. Data that may legitimately be absent stays
-`Option<T>` (TYPE-4), and the default for it is chosen by the caller that knows the context, in one
-named place.
-
-**Why.** An invented value is worse than a crash, because it flows downstream as if it were real. A
-corrupted status byte decoded as `Pending` makes a broken row look like a fresh job. In clp,
-aggregation jobs were left `PENDING` for a scheduler that no longer existed, so callers polled
-forever, and `write_to_file` jobs ran but wrote their results where no caller looked. Both now fail
-with `UnsupportedJobConfig` (y-scope/clp#2565). Wrapping a KQL query in parentheses to avoid one
-failure would have turned the syntax error `a) AND (b` into the valid `(a) AND (b)`. Defaulting the
-AWS region inside a shared helper sent AWS users to the wrong region. Now the caller, which knows
-the context, validates the input and picks the default.
-
-```rust,ignore
-// Bad
-let status = match code {
-    0 => Status::Pending,
-    1 => Status::Running,
-    _ => Status::Pending,
-};
-let region = region.map_or("us-east-1", NonEmptyString::as_str);
-args.push(OsString::from(format!("({})", query.as_str())));
-```
-
-```rust,ignore
-// Good
-let status = match code {
-    0 => Status::Pending,
-    1 => Status::Running,
-    other => return Err(DecodeError::UnknownStatus(other)),
-};
-if config.endpoint.is_none() && config.region.is_none() {
-    return Err(JobManagerError::MissingRegionCode);
-}
-args.push(OsString::from(query.as_str()));
-```
-
-**Review.**
-- In parsing and conversion code for external data, flag `unwrap_or(<literal>)`,
-  `unwrap_or_default()` and `_ => <valid variant>`. Ask whether absence is an error or should stay
-  an `Option` for the consumer to handle.
-- Flag request options that are accepted but then ignored or downgraded, and code that quotes, wraps
-  or trims a user payload so that it parses. Ask for an explicit `Unsupported*` or invalid-input
-  error and a recorded terminal status. Once a case is rejected upstream, later stages may mark it
-  `unreachable!("<why>")`.
-- A string from a request or config that becomes a filesystem path component must be checked to be
-  exactly one `Component::Normal`. Paths under a mount point need a lexically validated newtype
-  (absolute, no `..`) and a canonicalized containment check, because `Path::join` with an absolute
-  path replaces the base and `..` escapes it.
-
-**Exceptions.** Dropping unknown input as a deliberate forward-compatibility policy, provided it is
-an explicit, logged branch rather than a silent default.
-
-See also: TYPE-6 (closed sets as enums) and ERR-2 (recover only from the expected variant).
-
-**Sources.** y-scope/clp#2565, y-scope/clp#2578, y-scope/clp#2512, y-scope/clp#1776,
-y-scope/clp#2623, spider components/spider-task-executor/src/bin/spider_task_executor.rs,
-RustTraining type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md,
-RustTraining type-driven-correctness-book/src/ch17-redfish-applied-walkthrough.md
-
-## DEF-5: Cap every resource that a peer or a config value can size
-
-**Rule.** Every duration, count, size or rate that a request or a config controls, and that turns
-into server memory, time or lock hold time, gets an explicit server-side cap at the boundary: the
-unpack, `TryFrom` or `validate` layer. Name the bounds as `MIN_`/`MAX_` constants, check relations
-between fields (`hard_timeout > soft_timeout`), keep the limits in one module, and state the
-relations between limits with `const _: () = assert!(..)`. Enforce each limit on every path that
-produces or consumes the value.
-
-**Why.** Type checking can't stop a denial of service. Spider's dispatch queue holds a session
-`RwLock` read guard for the whole client-chosen `wait_time`, and the scheduler core needs the write
-side to bump the session, so one execution manager sending a huge `wait_time_ms` can stall the core.
-A zstd payload of a few KB decompressed with no output limit can expand to gigabytes. tonic's
-default 4 MiB decode limit rejected large success reports, which the execution manager then dropped,
-until the limits were made explicit and checked against each other (y-scope/spider#560). In clp, a
-max-results limit applied only to the Mongo path left file-backed results unbounded
-(y-scope/clp#2180), and a per-file timeout formula pushed tasks of more than 288 files past Spider's
-24 h maximum, so job submission failed (y-scope/clp#2668).
-
-```rust,ignore
-// Bad
-let wait_time = Duration::from_millis(request.wait_time_ms);
-let json = zstd::stream::decode_all(request.payload.as_slice())?;
-let hard_timeout_ms = num_files * 5 * 60 * 1000;
-```
-
-```rust,ignore
-// Good
-pub const MAX_WAIT_TIME: Duration = Duration::from_secs(30);
-pub const MAX_DECOMPRESSED_SIZE: usize = 64 * 1024 * 1024;
-pub const MAX_REPORT_OUTPUTS_SIZE: u64 = 4 * 1024 * 1024;
-pub const MAX_TASK_INSTANCE_MESSAGE_SIZE: usize = 32 * 1024 * 1024;
-const _: () = assert!(2 * MAX_REPORT_OUTPUTS_SIZE <= MAX_TASK_INSTANCE_MESSAGE_SIZE as u64);
-
-let wait_time = Duration::from_millis(request.wait_time_ms).min(MAX_WAIT_TIME);
-let json = zstd::bulk::decompress(&request.payload, MAX_DECOMPRESSED_SIZE)
-    .map_err(Error::ZstdDecompression)?;
-let estimate_ms = |throughput: NonZeroU64| {
-    estimated_uncompressed_size.saturating_mul(1000).div_ceil(throughput.get())
-};
-let soft_timeout_ms = estimate_ms(soft_throughput).clamp(MIN_SOFT_TIMEOUT_MS, MAX_TIMEOUT_MS - 1);
-let hard_timeout_ms = estimate_ms(hard_throughput)
-    .clamp(MIN_HARD_TIMEOUT_MS.max(soft_timeout_ms + 1), MAX_TIMEOUT_MS);
-```
-
-**Review.**
-- On inbound paths, grep for `Duration::from_*(request.`, `with_capacity(request.`, `decode_all`,
-  unbounded channels, and `while let Ok(_) = rx.try_recv()` on a queue that other tasks keep
-  filling. Each one needs a cap. For a drain, take a snapshot of `len()` and receive at most that
-  many items per tick.
-- When a PR adds a limit, check that every backend or output path enforces it, or that they all pass
-  through one choke point that does (preferably a combinator such as `StreamExt::take`). When a PR
-  raises a limit, check the limits that depend on it, such as an inner payload against the transport
-  decode limit, and pin the relation with a const assert.
-- Derived budgets such as timeouts should scale with what actually drives the cost (bytes, not
-  files), use saturating arithmetic, and be clamped into the downstream's accepted range. `clamp`
-  panics when its lower bound exceeds its upper bound, so a lower bound computed from another value
-  (here `soft_timeout_ms + 1`) must itself be clamped first. Ask for a test showing that the largest
-  input you can produce still fits.
-
-**Exceptions.** A limit may be deferred on purpose if the PR or the code says so and names the bound
-that holds in practice. For example, connections per session are bounded by the number of Spider
-workers.
-
-See also: TYPE-7 (the lower bound: `NonZero*`), DEF-9 and BND-7 (lengths read from bytes), ASYNC-6
-(bounded queues).
-
-**Sources.** spider components/spider-scheduler/src/dispatch_queue.rs, spider
-components/spider-proto-rust/src/unpack/scheduler.rs, spider
-components/spider-core/src/compression.rs, spider components/spider-storage/src/limits.rs,
-y-scope/spider#560, y-scope/spider#472, y-scope/spider#395, y-scope/spider#288, y-scope/clp#2180,
-y-scope/clp#2661, y-scope/clp#2668, y-scope/clp#2689
-
-## DEF-6: Return errors for what the environment can cause, and fail the whole service for broken invariants
-
-**Rule.** Decide between `Result` and a panic by asking who can break the condition. If input, I/O,
-a peer, randomness or concurrency can break it, return a typed error, however rare it is. If code
-you own proves it, use `expect` or `unreachable!` with the invariant as the message. Inside a
-spawned, long-running task, report a detected corruption of shared state or a protocol-impossible
-response by returning an `Internal`-style error or cancelling the root `CancellationToken`, so the
-whole service stops together. Don't panic the task, and don't log and carry on. Pin assumptions
-about constants with `const _: () = assert!(..)`.
-
-**Why.** A panic in a tokio task ends only that task. The `JoinHandle` captures it, and the rest of
-the service keeps serving on inconsistent shared state, without cleanup or final logs. Spider ties
-every detected corruption (a missing registry entry, a corrupted round-robin cursor, a cache/DB
-divergence) to the root token, so the gRPC server, the core and the trackers shut down together and
-visibly. The opposite mistakes are just as real. An `assert!` against a freshly generated random
-token colliding would crash production on a legitimate event. Retrying an auth error on a heartbeat
-that sends no credentials hides a protocol mismatch. A comment saying "this loop terminates only
-because `DOWNGRADE_LIVES == 1`" goes stale without anyone noticing, whereas a const assert fails the
-build.
-
-```rust,ignore
-// Bad
-tokio::spawn(async move {
-    loop {
-        let entry = table.get(&id).expect("registered execution managers should be tracked");
-        // ...
-    }
-});
-
-Err(LivenessResponseError::ResourceGroupAuth) => {
-    tracing::warn!("Heartbeat authentication failed. Retrying next tick.");
-}
-```
-
-```rust,ignore
-// Good
-let Some(entry) = table.get(&id) else {
-    tracing::error!(id = % id, "Execution manager no longer exists. The liveness tracker is corrupted.");
-    root_token.cancel();
-    return;
-};
-
-Err(LivenessResponseError::ResourceGroupAuth) => {
-    tracing::error!(
-        "Storage returned an unexpected resource group authentication error for a heartbeat. \
-         Cancelling the runtime."
-    );
-    self.cancellation_token.cancel();
-}
-
-const _: () = assert!(DOWNGRADE_LIVES == 1, "a larger downgrade budget needs a per-tick visited set");
-```
-
-**Review.**
-- For each new `expect`, `assert!` or `unreachable!`, ask whether anything outside the code (input,
-  a peer, the clock, randomness, a race) can trigger it. If so, it must be an error variant. If not,
-  the message should state the invariant ("`split_into_batches` never yields an empty batch") rather
-  than restate the failure, and a case that is proven impossible should not also keep a dead error
-  variant.
-- In spawned service loops, flag `expect` and `panic!` on facts that depend on shared state another
-  component maintains (a registry entry, a cursor, the cache matching the DB). Either report through
-  the root token or an `Internal` error, or remove the fallible step altogether by storing the value
-  in the form the loop consumes, for example a `u64` milliseconds field passed straight to the RPC.
-  An `expect` on a fact proven earlier in the same function, such as DEF-2's validated index, stays.
-- Flag comments that state an assumption about a constant or a limit relation, and ask for a const
-  assert inside the function that relies on it. Also flag checks that only accept the current
-  backend's behaviour (session ID 0 "never" coming from MariaDB) when the documented contract allows
-  it.
-
-**Exceptions.** Synchronous startup and CLI code, where unwinding already takes the process down,
-and test helpers (coding-style.md § Panic in test helpers when the failure means the test is wrong).
-
-See also: pr-review.md § Panic vs error returns; coding-style.md § Assert preconditions instead of
-tolerating them and § Using `unwrap`; ERR-1 (the fatal error tier) and ASYNC-4 (routing fatal errors
-to the shutdown handle).
-
-**Sources.** spider components/spider-scheduler/src/execution_manager_registry.rs, spider
-components/spider-scheduler/src/runtime.rs, spider components/spider-scheduler/src/grpc.rs, spider
-components/spider-execution-manager/src/liveness.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs,
-y-scope/spider#464, y-scope/spider#462, y-scope/spider#342, y-scope/spider#359, y-scope/spider#549,
-y-scope/spider#557, y-scope/clp#2689, y-scope/clp#2661, y-scope/clp#2420, y-scope/clp#2513,
-RustTraining type-driven-correctness-book/src/ch15-const-fn-compile-time-correctness-proofs.md
-
-## DEF-7: Retry only transient failures, with backoff, and only idempotent operations
-
-**Rule.** Retry through one helper that takes an `is_retriable` classifier, a finite attempt budget,
-and capped exponential backoff with jitter computed without overflow (see DEF-8). Retry only
-idempotent operations: reads, or writes keyed by a deterministic ID or an idempotency key. Let
-permanent errors bring the item to a terminal state. On the server side, an operation that may be
-replayed (start, cancel, terminate, fail) treats "already in the requested state, or past it" as
-success, recognised by a typed variant rather than by matching message text. Every loop that retries
-on error sleeps, including an ad-hoc `continue`.
-
-**Why.** Retrying every error turns permanent failures into hangs. clp's cancellation monitor
-retried a cancel that kept returning `JobNotFound`, so it got stuck on that job and blocked every
-later cancellation. Retrying a non-idempotent call after a lost response duplicates the work:
-Spider's `register_job` runs under `call_with_retry`, which also retries `Code::Unknown` transport
-failures that can happen after the server has committed. The classifier has to inspect the source
-chain, because tonic reports a dropped connection as `Code::Unknown` with a `transport::Error`
-source. The server side has to cooperate too. If a repeated `start_job` or cancel fails because the
-job already started or was already cancelled, a crash-recovery path turns into a permanent failure.
-Tasks that the scheduler may retry need deterministic output names (`{job_id}-{task_index}-{n}`), so
-that a retry overwrites its own output instead of leaving orphans.
-
-```rust,ignore
-// Bad
-loop {
-    match scheduler.next_task().await {
-        Ok(task) => run(task).await,
-        Err(_) => continue,
-    }
-}
-
-let archive_id = Uuid::new_v4();
-```
-
-```rust,ignore
-// Good
-let mut retry: u32 = 0;
-loop {
-    match scheduler.next_task().await {
-        Ok(task) => {
-            retry = 0;
-            run(task).await;
-        }
-        Err(e) if e.is_transient() => {
-            tracing::warn!(error = % e, "Scheduler returned a transient error. Retrying.");
-            tokio::time::sleep(backoff(retry, MAX_BACKOFF)).await;
-            retry = retry.saturating_add(1);
-        }
-        Err(e) => return Err(e.into()),
-    }
-}
-
-match self.start_job(job_id).await {
-    Ok(_) | Err(ClientError::InvalidJobState(_)) => {}
-    Err(e) => return Err(e.into()),
-}
-
-let archive_id = format!("{job_id}-{task_index}-{archive_index}");
-```
-
-**Review.**
-- For each retry loop or `call_with_retry`, check for a classifier (itself an exhaustive match, per
-  DEF-1), a budget, a cap and jitter, and check that only the network round-trip sits inside the
-  retried closure, with serialization and decoding outside it.
-- Check that the retried operation is idempotent. Create, register or enqueue calls under retry need
-  an idempotency key or a deterministic ID. Otherwise make a single attempt.
-- In poll and recovery loops, a permanent error (`NotFound`, invalid state, corrupted metadata) must
-  finish the item instead of being retried on the next tick. Flag `let _ = op().await` used to make
-  a replay "idempotent". Match the one "already done" variant instead, and check that the variant
-  can only mean "already done or past it" (`InvalidJobState` from `start_job` qualifies only because
-  a job leaves `Ready` by being started or cancelled, and the next poll observes which).
-
-**Exceptions.** A long-running service loop, such as an execution manager polling its scheduler, may
-retry indefinitely, as long as it backs off and logs each failure.
-
-See also: pr-review.md § Don't silently swallow errors; OWN-4 (how the retried closure builds its
-future).
-
-**Sources.** y-scope/clp#2573, y-scope/clp#2402, y-scope/clp#2589, y-scope/clp#2646,
-y-scope/clp#2035, y-scope/spider#396, y-scope/spider#319, spider
-components/spider-utils/src/grpc/retry.rs, spider components/spider-client/src/grpc/job.rs, spider
-components/spider-execution-manager/src/runtime.rs, RustTraining
-async-book/src/ch13-production-patterns.md, RustTraining
-rust-patterns-book/src/ch07-closures-and-higher-order-functions.md
-
-## DEF-8: Choose an overflow behaviour for every arithmetic on unbounded values
+## DEF-3: Choose an overflow behaviour for every arithmetic on unbounded values
 
 **Rule.** For arithmetic on values that come from outside or grow without a proven bound (sizes,
 offsets, counts, retry counters, `Instant`/`SystemTime` plus or minus a `Duration`), use `checked_*`
@@ -2090,20 +1784,29 @@ query.bind(i64::try_from(limit).expect("limit is bounded by `Semaphore::MAX_PERM
 **Exceptions.** Arithmetic on values that are provably small where they are computed (constants, an
 index over a slice already in hand), modular hashing or sequence numbers, which should use
 `wrapping_*` explicitly, and a lossless widening `as` inside a `const` item, where `From` isn't
-callable (DEF-5's `MAX_TASK_INSTANCE_MESSAGE_SIZE as u64`).
+callable (SRV-3's `MAX_TASK_INSTANCE_MESSAGE_SIZE as u64`).
 
 See also: coding-style.md § Use `u64` for sizes that may exceed 32-bit; pr-review.md § Panic vs
 error returns (which classes overflow from external IDs as an error).
 
-**Sources.** y-scope/spider#396, y-scope/spider#472, y-scope/spider#395, y-scope/spider#290, spider
-components/spider-utils/src/grpc/retry.rs, spider components/spider-storage/src/cache/job.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs, spider
-components/spider-task-executor/src/bin/spider_task_executor.rs, y-scope/clp#2435, y-scope/clp#2402,
-y-scope/clp#2403, RustTraining engineering-book/src/ch07-release-profiles-and-binary-size.md,
-RustTraining rust-patterns-book/src/ch14-testing-and-benchmarking-patterns.md, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md
+**Sources.**
 
-## DEF-9: Decode external input with checked slicing, never indexing
+- [y-scope/spider#396](https://github.com/y-scope/spider/pull/396): the retry backoff's doubling is overflow-safe
+- [y-scope/spider#472](https://github.com/y-scope/spider/pull/472#discussion_r3980589460): cap the wait time and detect `Instant` overflow with `checked_add`
+- [y-scope/spider#395](https://github.com/y-scope/spider/pull/395): reschedules assignments through the resource-group dispatch queue
+- [y-scope/spider#290](https://github.com/y-scope/spider/pull/290#discussion_r2984962083): a child's unfinished-parent counter reaching 0 early is a corruption
+- [spider `spider-utils/src/grpc/retry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/grpc/retry.rs#L154-L168): `backoff` uses `checked_shl`/`checked_mul` and falls back to the cap
+- [spider `spider-storage/src/cache/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/job.rs#L528-L591): `SharedJobControlBlock::succeed_task_instance` computes `fetch_sub(1, ..) - 1`
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs#L259-L283): `DispatchQueueRegistry::dequeue_pinned` adds a client-chosen `wait_time` to `Instant::now()`
+- [spider `spider-task-executor/src/bin/spider_task_executor.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-task-executor/src/bin/spider_task_executor.rs#L128): `u64::try_from(..).unwrap_or(u64::MAX)` saturates the elapsed time
+- [y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3754801204): `i64::try_from(limit).expect(..)`, bounded by `Semaphore::MAX_PERMITS`
+- [y-scope/clp#2402](https://github.com/y-scope/clp/pull/2402#discussion_r3625644781): `saturating_mul` so the poll backoff can't overflow
+- [y-scope/clp#2403](https://github.com/y-scope/clp/pull/2403#pullrequestreview-4739365794): decrement the buffered size per file so the no-underflow argument stays local
+- [RustTraining engineering-book § Release Profile Anatomy](https://microsoft.github.io/RustTraining/engineering-book/ch07-release-profiles-and-binary-size.html#release-profile-anatomy): the release profile defaults to `overflow-checks = false`
+- [RustTraining rust-patterns-book § Unit Tests, Integration Tests, Doc Tests](https://microsoft.github.io/RustTraining/rust-patterns-book/ch14-testing-and-benchmarking-patterns.html#unit-tests-integration-tests-doc-tests): an overflow test that only passes under `cfg(debug_assertions)`
+- [RustTraining type-driven-correctness-book § Case Study: IPMI FRU Data](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#case-study-ipmi-fru-data): a modular checksum written with explicit `wrapping_add`
+
+## DEF-4: Decode external input with checked slicing, never indexing
 
 **Rule.** When parsing bytes from the network, disk or another process, read fixed-size prefixes
 with `split_first_chunk::<N>()` and variable lengths with `split_at_checked` or `get(..)`, convert
@@ -2117,12 +1820,19 @@ of service in a single packet. A hand-written `pos + len > data.len()` check fol
 can overflow, so the check passes and the slice panics anyway. A 4-byte header claiming 2^32 entries
 allocates gigabytes before the first read fails. Spider's `wire.rs` contains both the good form
 (`split_first_chunk`, bounded `with_capacity`) and the bad form (a manual `self.pos + field_len`
-check, then a slice) in sibling parsers of the same format. The chunk APIs also hand back
-`&[u8; N]`, so there is no impossible `try_into` error left to invent a message for.
+check, then a slice) in sibling parsers of the same format. `u32::from_le_bytes` needs a
+`[u8; 4]`. A slice such as `&data[0..4]` is a `&[u8]`, so turning it into an array takes a
+`try_into()` that can never fail but still returns a `Result`. That forces an `expect` or a made-up
+error like `InvalidFormat("unreachable")`. `split_first_chunk::<4>()` returns the `&[u8; 4]`
+directly, together with the length check, so the only error left (a buffer that's too short) is a
+real one.
 
 ```rust,ignore
 // Bad
-let count = u32::from_le_bytes(data[0..4].try_into().map_err(|_| WireError::InvalidFormat("unreachable"))?);
+let count_bytes: [u8; 4] = data[0..4]
+    .try_into()
+    .map_err(|_| WireError::InvalidFormat("unreachable"))?;
+let count = u32::from_le_bytes(count_bytes);
 let mut payloads = Vec::with_capacity(count as usize);
 if self.pos + len > self.data.len() {
     return Err(WireError::InvalidFormat("truncated payload"));
@@ -2166,13 +1876,18 @@ for _ in 0..count {
 **Exceptions.** Indexing a `[u8; N]` with constants after the conversion, and indices produced by
 the same function from the same collection (`enumerate`, `position`).
 
-**Sources.** See also BND-7 (bounding byte streams from peers) and TEST-8 (feeding decoders byte by
-byte). spider components/spider-utils/src/wire.rs, y-scope/spider#308, spider
-components/spider-core/src/types/io/task_graph_input.rs, y-scope/clp#2649, RustTraining
-rust-patterns-book/src/ch11-serialization-zero-copy-and-binary-data.md, RustTraining
-c-cpp-book/src/ch17-2-avoiding-unchecked-indexing.md
+See also: BND-7 (bounding byte streams from peers) and TEST-8 (feeding decoders byte by byte).
 
-## DEF-10: Confine `unsafe` behind a safe API, and state its contract in the right place
+**Sources.**
+
+- [spider `spider-utils/src/wire.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/wire.rs#L311-L338): `WireFrameBuilder::unframe_payload_slices`: `split_first_chunk`, capped `with_capacity`
+- [y-scope/spider#308](https://github.com/y-scope/spider/pull/308#discussion_r3088855874): rewritten with `first_chunk` to drop an unreachable `try_into` error
+- [spider `spider-core/src/types/io/task_graph_input.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/io/task_graph_input.rs#L103-L125): `TaskGraphInputEntry::from_wire_payload`: `split_first` and a checked shared-input ID
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4438333071): test that a result frame decodes only once it is complete
+- [RustTraining rust-patterns-book § zerocopy and bytemuck — Safe Transmutation](https://microsoft.github.io/RustTraining/rust-patterns-book/ch11-serialization-zero-copy-and-binary-data.html#zerocopy-and-bytemuck--safe-transmutation): size-checked byte conversions that fail instead of panicking
+- [RustTraining c-cpp-book § Avoiding unchecked indexing](https://microsoft.github.io/RustTraining/c-cpp-book/ch17-2-avoiding-unchecked-indexing.html#avoiding-unchecked-indexing): use `.get()` unless the index is provably valid
+
+## DEF-5: Confine `unsafe` behind a safe API, and state its contract in the right place
 
 **Rule.** Keep each `unsafe` block to the single operation that needs it, and put a `// SAFETY:`
 comment on it naming the invariant and why it holds at this call site. A function whose soundness
@@ -2239,13 +1954,416 @@ pub extern "C" fn lib_process(input: *const c_char) -> c_int {
 See also: coding-style.md § Take ownership when the value mustn't be used afterwards (why
 `ManuallyDrop` and `mem::forget` are not ways to skip `Drop`).
 
-**Sources.** spider components/spider-tdl/src/ffi.rs, spider components/spider-tdl/src/register.rs,
-spider components/spider-task-executor/src/manager.rs, RustTraining
-rust-patterns-book/src/ch12-unsafe-rust-controlled-danger.md, RustTraining
-rust-patterns-book/src/ch06-concurrency-vs-parallelism-vs-threads.md, RustTraining
-rust-patterns-book/src/ch10-error-handling-patterns.md, RustTraining
-type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md, RustTraining
-engineering-book/src/ch05-miri-valgrind-and-sanitizers-verifying-u.md
+**Sources.**
+
+- [spider `spider-tdl/src/ffi.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/ffi.rs#L68-L84): `CArray::as_slice`, a safe fn with a `# Safety` section
+- [spider `spider-tdl/src/register.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/register.rs#L138-L175): the macro-generated `__spider_tdl_package_execute` has no `catch_unwind`
+- [spider `spider-task-executor/src/manager.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-task-executor/src/manager.rs#L168-L190): `TdlPackage::execute_task`: a `// SAFETY:` comment on the FFI call
+- [RustTraining rust-patterns-book § Writing Sound Abstractions](https://microsoft.github.io/RustTraining/rust-patterns-book/ch12-unsafe-rust-controlled-danger.html#writing-sound-abstractions): encapsulate `unsafe` so that every public method is safe
+- [RustTraining rust-patterns-book § Lock-Free Patterns](https://microsoft.github.io/RustTraining/rust-patterns-book/ch06-concurrency-vs-parallelism-vs-threads.html#lock-free-patterns): prefer proven crates to hand-rolled lock-free code
+- [RustTraining rust-patterns-book § Panics, catch_unwind, and When to Abort](https://microsoft.github.io/RustTraining/rust-patterns-book/ch10-error-handling-patterns.html#panics-catch_unwind-and-when-to-abort): `catch_unwind` belongs at FFI and thread-pool boundaries
+- [RustTraining type-driven-correctness-book § Safe Wrappers Around `unsafe`](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-7--safe-wrappers-around-unsafe): wrap every `unsafe` block in a safe, auditable abstraction
+- [RustTraining engineering-book § When to Use Which Tool](https://microsoft.github.io/RustTraining/engineering-book/ch05-miri-valgrind-and-sanitizers-verifying-u.html#when-to-use-which-tool): Miri for pure-Rust `unsafe`, sanitizers and Valgrind for FFI
+
+# Server design
+
+Most of our Rust runs as long-lived services, such as coordinators, schedulers and storage, that
+talk to peers which retry, crash and restart. The rules here cover how such a service treats its
+peers and its own failures: progress that must not be replayed, input it can't honour, resources an
+outsider can size, failures it should survive versus ones that should stop it, and when to retry.
+
+## SRV-1: Let progress state only move forward
+
+**Rule.** Cursors, epochs and session IDs record how far something has gotten, so they only move
+forward. Give them a `try_advance`, not a `set`, and don't overwrite one with the result of a fetch
+that can come back empty. Check work stamped with an epoch against the current epoch at every point
+where it is consumed, not only once.
+
+**Why.** Progress state that moves backwards replays work already done. The S3 scanner overwrote its
+`start_after` cursor with `None` after a scan that found nothing, so the next scan started over and
+re-ingested the same object 286 times ([y-scope/clp#2333](https://github.com/y-scope/clp/pull/2333)).
+A plain `set` on an epoch breaks the same way when writers race: a late writer stores an older value
+over a newer one, and work from the superseded session looks current again. Spider stamps every
+assignment with a session ID that only advances, and drops stale assignments at dequeue, hint
+redemption, reschedule drain and completion.
+
+```rust,ignore
+// Bad
+impl SessionTracker {
+    pub fn set(&self, session_id: SessionId) {
+        self.inner.store(session_id, Ordering::Release);
+    }
+}
+```
+
+```rust,ignore
+// Good
+impl SessionTracker {
+    pub fn try_advance(&self, session_id: SessionId) -> bool {
+        self.inner.fetch_max(session_id, Ordering::AcqRel) < session_id
+    }
+}
+```
+
+**Review.**
+- Flag a raw `set` or `store` on an epoch, session ID or cursor, and `self.cursor = <fetch that
+  returns an Option>`. Ask for `try_advance` (`fetch_max`, or a CAS loop) and for keeping the old
+  value when the fetch returns nothing.
+- Flag work that can outlive a reset but carries no epoch, or whose epoch is checked only when the
+  work is created.
+
+**Sources.**
+
+- [y-scope/clp#2333](https://github.com/y-scope/clp/pull/2333): stops overwriting the `start_after` cursor after an empty scan
+- [clp `log-ingestor/src/ingestion_job/s3_scanner.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/log-ingestor/src/ingestion_job/s3_scanner.rs#L107-L111): `start_after` is updated only when the scan ingested new objects
+- [y-scope/spider#328](https://github.com/y-scope/spider/pull/328): `SessionTracker` only moves the session ID forward, via a CAS loop
+- [spider `spider-core/src/session.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/session.rs#L51-L67): `SessionTracker::try_advance`, a forward-only CAS loop
+- [spider `spider-scheduler/src/service.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/service.rs#L176-L206): `SchedulerServiceState::complete_task_assignment` drops completions from a stale scheduler
+
+## SRV-2: Turn unknown, missing or unsupported input into an error, never a plausible value
+
+**Rule.** When an external discriminant is not one you recognise, when a required field is absent,
+or when a request asks for something the component can't honour, return an error variant carrying
+the offending value (`UnknownStatus(u8)`, `UnsupportedJobConfig(..)`). Don't fall back to a
+valid-looking variant, invent a default while parsing, quietly run a degraded version of the
+request, or rewrite malformed input until it passes. Data that may legitimately be absent stays
+`Option<T>` (TYPE-4), and the default for it is chosen by the caller that knows the context, in one
+named place.
+
+**Why.** An invented value is worse than a crash, because it flows downstream as if it were real. A
+corrupted status byte decoded as `Pending` makes a broken row look like a fresh job. In clp,
+aggregation jobs were left `PENDING` for a scheduler that no longer existed, so callers polled
+forever, and `write_to_file` jobs ran but wrote their results where no caller looked. Both now fail
+with `UnsupportedJobConfig` ([y-scope/clp#2565](https://github.com/y-scope/clp/pull/2565)). Wrapping
+a KQL query in parentheses to avoid one failure would have turned the syntax error `a) AND (b` into
+the valid `(a) AND (b)`. Defaulting the AWS region inside a shared helper sent AWS users to the
+wrong region. Now the caller, which knows the context, validates the input and picks the default.
+
+```rust,ignore
+// Bad
+let status = match code {
+    0 => Status::Pending,
+    1 => Status::Running,
+    _ => Status::Pending,
+};
+let region = region.map_or("us-east-1", NonEmptyString::as_str);
+args.push(OsString::from(format!("({})", query.as_str())));
+```
+
+```rust,ignore
+// Good
+let status = match code {
+    0 => Status::Pending,
+    1 => Status::Running,
+    other => return Err(DecodeError::UnknownStatus(other)),
+};
+if config.endpoint.is_none() && config.region.is_none() {
+    return Err(JobManagerError::MissingRegionCode);
+}
+args.push(OsString::from(query.as_str()));
+```
+
+**Review.**
+- In parsing and conversion code for external data, flag `unwrap_or(<literal>)`,
+  `unwrap_or_default()` and `_ => <valid variant>`. Ask whether absence is an error or should stay
+  an `Option` for the consumer to handle.
+- Flag request options that are accepted but then ignored or downgraded, and code that quotes, wraps
+  or trims a user payload so that it parses. Ask for an explicit `Unsupported*` or invalid-input
+  error and a recorded terminal status. Once a case is rejected upstream, later stages may mark it
+  `unreachable!("<why>")`.
+- A string from a request or config that becomes a filesystem path component must be checked to be
+  exactly one `Component::Normal`. Paths under a mount point need a lexically validated newtype
+  (absolute, no `..`) and a canonicalized containment check, because `Path::join` with an absolute
+  path replaces the base and `..` escapes it.
+
+**Exceptions.** Dropping unknown input as a deliberate forward-compatibility policy, provided it is
+an explicit, logged branch rather than a silent default.
+
+See also: TYPE-6 (closed sets as enums) and ERR-2 (recover only from the expected variant).
+
+**Sources.**
+
+- [y-scope/clp#2565](https://github.com/y-scope/clp/pull/2565): aggregation and write-to-file jobs now fail as `UnsupportedJobConfig`
+- [y-scope/clp#2578](https://github.com/y-scope/clp/pull/2578#discussion_r4500099642): reviewer asks to mark the upstream-rejected file output `unreachable`
+- [y-scope/clp#2512](https://github.com/y-scope/clp/pull/2512#discussion_r3985243866): wrapping the query in parentheses would make `a) AND (b` valid
+- [y-scope/clp#1776](https://github.com/y-scope/clp/pull/1776#pullrequestreview-3600460172): the caller validates endpoint and region and picks the default region
+- [y-scope/clp#2623](https://github.com/y-scope/clp/pull/2623): validates logs-input paths before resolving them under the mount point
+- [spider `spider-task-executor/src/bin/spider_task_executor.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-task-executor/src/bin/spider_task_executor.rs#L69-L84): `run_task` joins a request's package name into a filesystem path
+- [RustTraining type-driven-correctness-book § Parse, Don't Validate](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#parse-dont-validate): parse once into a type that can't hold invalid data
+- [RustTraining type-driven-correctness-book § Typed Telemetry Reads](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch17-redfish-applied-walkthrough.html#section-4--typed-telemetry-reads-typed-commands--dimensional-analysis-ch02--ch06): a missing required field is a parse error, not a default
+
+## SRV-3: Cap every resource that a peer or a config value can size
+
+**Rule.** Every duration, count, size or rate that a request or a config controls, and that turns
+into server memory, time or lock hold time, gets an explicit server-side cap at the boundary: the
+unpack, `TryFrom` or `validate` layer. Name the bounds as `MIN_`/`MAX_` constants, check relations
+between fields (`hard_timeout > soft_timeout`), keep the limits in one module, and state the
+relations between limits with `const _: () = assert!(..)`. Enforce each limit on every path that
+produces or consumes the value.
+
+**Why.** Type checking can't stop a denial of service. Spider's dispatch queue holds a session
+`RwLock` read guard for the whole client-chosen `wait_time`, and the scheduler core needs the write
+side to bump the session, so one execution manager sending a huge `wait_time_ms` can stall the core.
+A zstd payload of a few KB decompressed with no output limit can expand to gigabytes. tonic's
+default 4 MiB decode limit rejected large success reports, which the execution manager then dropped,
+until the limits were made explicit and checked against each other
+([y-scope/spider#560](https://github.com/y-scope/spider/pull/560)). In clp, a max-results limit
+applied only to the Mongo path left file-backed results unbounded
+([y-scope/clp#2180](https://github.com/y-scope/clp/pull/2180#discussion_r3059505785)), and a
+per-file timeout formula pushed tasks of more than 288 files past Spider's 24 h maximum, so job
+submission failed ([y-scope/clp#2668](https://github.com/y-scope/clp/pull/2668)).
+
+```rust,ignore
+// Bad
+let wait_time = Duration::from_millis(request.wait_time_ms);
+let json = zstd::stream::decode_all(request.payload.as_slice())?;
+let hard_timeout_ms = num_files * 5 * 60 * 1000;
+```
+
+```rust,ignore
+// Good
+pub const MAX_WAIT_TIME: Duration = Duration::from_secs(30);
+pub const MAX_DECOMPRESSED_SIZE: usize = 64 * 1024 * 1024;
+pub const MAX_REPORT_OUTPUTS_SIZE: u64 = 4 * 1024 * 1024;
+pub const MAX_TASK_INSTANCE_MESSAGE_SIZE: usize = 32 * 1024 * 1024;
+const _: () = assert!(2 * MAX_REPORT_OUTPUTS_SIZE <= MAX_TASK_INSTANCE_MESSAGE_SIZE as u64);
+
+let wait_time = Duration::from_millis(request.wait_time_ms).min(MAX_WAIT_TIME);
+let json = zstd::bulk::decompress(&request.payload, MAX_DECOMPRESSED_SIZE)
+    .map_err(Error::ZstdDecompression)?;
+let estimate_ms = |throughput: NonZeroU64| {
+    estimated_uncompressed_size.saturating_mul(1000).div_ceil(throughput.get())
+};
+let soft_timeout_ms = estimate_ms(soft_throughput).clamp(MIN_SOFT_TIMEOUT_MS, MAX_TIMEOUT_MS - 1);
+let hard_timeout_ms = estimate_ms(hard_throughput)
+    .clamp(MIN_HARD_TIMEOUT_MS.max(soft_timeout_ms + 1), MAX_TIMEOUT_MS);
+```
+
+**Review.**
+- On inbound paths, grep for `Duration::from_*(request.`, `with_capacity(request.`, `decode_all`,
+  unbounded channels, and `while let Ok(_) = rx.try_recv()` on a queue that other tasks keep
+  filling. Each one needs a cap. For a drain, take a snapshot of `len()` and receive at most that
+  many items per tick.
+- When a PR adds a limit, check that every backend or output path enforces it, or that they all pass
+  through one choke point that does (preferably a combinator such as `StreamExt::take`). When a PR
+  raises a limit, check the limits that depend on it, such as an inner payload against the transport
+  decode limit, and pin the relation with a const assert.
+- Derived budgets such as timeouts should scale with what actually drives the cost (bytes, not
+  files), use saturating arithmetic, and be clamped into the downstream's accepted range. `clamp`
+  panics when its lower bound exceeds its upper bound, so a lower bound computed from another value
+  (here `soft_timeout_ms + 1`) must itself be clamped first. Ask for a test showing that the largest
+  input you can produce still fits.
+
+**Exceptions.** A limit may be deferred on purpose if the PR or the code says so and names the bound
+that holds in practice. For example, connections per session are bounded by the number of Spider
+workers.
+
+See also: TYPE-7 (the lower bound: `NonZero*`), DEF-4 and BND-7 (lengths read from bytes), ASYNC-6
+(bounded queues).
+
+**Sources.**
+
+- [spider `spider-scheduler/src/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/dispatch_queue.rs#L118-L148): `DispatchQueueReader::dequeue` holds the session read guard for the whole `wait_time`
+- [spider `spider-proto-rust/src/unpack/scheduler.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/unpack/scheduler.rs#L33-L44): `NextTaskRequest::unpack` converts `wait_time_ms` without a cap
+- [spider `spider-core/src/compression.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/compression.rs#L29-L31): `decode_zstd_bytes` calls `decode_all` with no output limit
+- [spider `spider-storage/src/limits.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/limits.rs#L27-L40): the limits module; report and message sizes pinned by a const assert
+- [y-scope/spider#560](https://github.com/y-scope/spider/pull/560#discussion_r4507591661): assert that the message limit leaves a margin over the outputs limit
+- [y-scope/spider#472](https://github.com/y-scope/spider/pull/472#discussion_r3980589460): cap the wait time at the service level and detect overflow with `checked_add`
+- [y-scope/spider#395](https://github.com/y-scope/spider/pull/395): the reschedule step drains a bounded snapshot of the queue per tick
+- [y-scope/spider#288](https://github.com/y-scope/spider/pull/288#discussion_r2968571739): reviewer asks for a 24-hour maximum timeout
+- [y-scope/clp#2180](https://github.com/y-scope/clp/pull/2180#discussion_r3059505785): the results limit also has to be applied to `fetch_results_from_file`
+- [y-scope/clp#2180](https://github.com/y-scope/clp/pull/2180#discussion_r3059574303): enforce the limit with `StreamExt::take` instead of counting by hand
+- [y-scope/clp#2661](https://github.com/y-scope/clp/pull/2661#issuecomment-6619241828): the per-file timeout puts tasks of over 288 files past 24 h
+- [y-scope/clp#2668](https://github.com/y-scope/clp/pull/2668#discussion_r4486559669): reviewer sets minimum soft and hard timeouts for the derived budget
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689#discussion_r4507624749): the connection limit is deferred: Spider's worker count bounds it
+
+## SRV-4: Return errors for what the environment can cause, and fail the whole service for broken invariants
+
+**Rule.** Decide between `Result` and a panic by asking who can break the condition. If input, I/O,
+a peer, randomness or concurrency can break it, return a typed error, however rare it is. If code
+you own proves it, use `expect` or `unreachable!` with the invariant as the message. Inside a
+spawned, long-running task, report a detected corruption of shared state or a protocol-impossible
+response by returning an `Internal`-style error or cancelling the root `CancellationToken`, so the
+whole service stops together. Don't panic the task, and don't log and carry on. Pin assumptions
+about constants with `const _: () = assert!(..)`.
+
+**Why.** A panic in a tokio task ends only that task. The `JoinHandle` captures it, and the rest of
+the service keeps serving on inconsistent shared state, without cleanup or final logs. Spider ties
+every detected corruption (a missing registry entry, a corrupted round-robin cursor, a cache/DB
+divergence) to the root token, so the gRPC server, the core and the trackers shut down together and
+visibly. The opposite mistakes are just as real. An `assert!` against a freshly generated random
+token colliding would crash production on a legitimate event. Retrying an auth error on a heartbeat
+that sends no credentials hides a protocol mismatch. A comment saying "this loop terminates only
+because `DOWNGRADE_LIVES == 1`" goes stale without anyone noticing, whereas a const assert fails the
+build.
+
+```rust,ignore
+// Bad
+tokio::spawn(async move {
+    loop {
+        let entry = table.get(&id).expect("registered execution managers should be tracked");
+        // ...
+    }
+});
+
+Err(LivenessResponseError::ResourceGroupAuth) => {
+    tracing::warn!("Heartbeat authentication failed. Retrying next tick.");
+}
+```
+
+```rust,ignore
+// Good
+let Some(entry) = table.get(&id) else {
+    tracing::error!(id = % id, "Execution manager no longer exists. The liveness tracker is corrupted.");
+    root_token.cancel();
+    return;
+};
+
+Err(LivenessResponseError::ResourceGroupAuth) => {
+    tracing::error!(
+        "Storage returned an unexpected resource group authentication error for a heartbeat. \
+         Cancelling the runtime."
+    );
+    self.cancellation_token.cancel();
+}
+
+const _: () = assert!(DOWNGRADE_LIVES == 1, "a larger downgrade budget needs a per-tick visited set");
+```
+
+**Review.**
+- For each new `expect`, `assert!` or `unreachable!`, ask whether anything outside the code (input,
+  a peer, the clock, randomness, a race) can trigger it. If so, it must be an error variant. If not,
+  the message should state the invariant ("`split_into_batches` never yields an empty batch") rather
+  than restate the failure, and a case that is proven impossible should not also keep a dead error
+  variant.
+- In spawned service loops, flag `expect` and `panic!` on facts that depend on shared state another
+  component maintains (a registry entry, a cursor, the cache matching the DB). Either report through
+  the root token or an `Internal` error, or remove the fallible step altogether by storing the value
+  in the form the loop consumes, for example a `u64` milliseconds field passed straight to the RPC.
+  An `expect` on a fact proven earlier in the same function, such as DEF-1's validated index, stays.
+- Flag comments that state an assumption about a constant or a limit relation, and ask for a const
+  assert inside the function that relies on it. Also flag checks that only accept the current
+  backend's behaviour (session ID 0 "never" coming from MariaDB) when the documented contract allows
+  it.
+
+**Exceptions.** Synchronous startup and CLI code, where unwinding already takes the process down,
+and test helpers (coding-style.md § Panic in test helpers when the failure means the test is wrong).
+
+See also: pr-review.md § Panic vs error returns; coding-style.md § Assert preconditions instead of
+tolerating them and § Using `unwrap`; ERR-1 (the fatal error tier) and ASYNC-4 (routing fatal errors
+to the shutdown handle).
+
+**Sources.**
+
+- [spider `spider-scheduler/src/execution_manager_registry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/execution_manager_registry.rs#L223-L281): `ExecutionManagerRegistry::track_liveness` cancels the root token on a missing entry
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L109-L164): `create_runtime` shares one token; a core error cancels it
+- [spider `spider-scheduler/src/grpc.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/grpc.rs#L56-L111): `GrpcSchedulerService::service_error_handler` cancels the service on `Internal`
+- [spider `spider-execution-manager/src/liveness.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/liveness.rs#L130-L178): `LivenessActor::send_heartbeat` cancels the runtime on protocol-impossible replies
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs#L243-L284): `RgSchedulingState::pop_regular_task` pins `DOWNGRADE_LIVES == 1` with a const assert
+- [y-scope/spider#464](https://github.com/y-scope/spider/pull/464#discussion_r3905764333): an auth error is unreachable from a heartbeat: log it and shut down
+- [y-scope/spider#462](https://github.com/y-scope/spider/pull/462): adds the scheduling state and its `DOWNGRADE_LIVES` const assert
+- [y-scope/spider#342](https://github.com/y-scope/spider/pull/342#discussion_r3482613668): a fatal error there skips `main_loop`'s cleanup and logging
+- [y-scope/spider#342](https://github.com/y-scope/spider/pull/342#discussion_r3482671121): keep the poll timeout a `u64` passed straight to the RPC
+- [y-scope/spider#359](https://github.com/y-scope/spider/pull/359#discussion_r3488421185): session ID 0 is valid by policy, merely impossible with MariaDB
+- [y-scope/spider#549](https://github.com/y-scope/spider/pull/549): a cache/DB divergence or a committer error shuts the service down
+- [y-scope/spider#557](https://github.com/y-scope/spider/pull/557): a job changed twice in one round is a fatal internal error
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689#discussion_r4507699895): reviewer asks for an error instead of an assertion
+- [y-scope/clp#2661](https://github.com/y-scope/clp/pull/2661#discussion_r4471968351): this can't happen after `canonicalize`, so use `expect`
+- [y-scope/clp#2420](https://github.com/y-scope/clp/pull/2420#discussion_r3654284372): use `unreachable` since the factory already checked this
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r4057713082): a changed or missing job row is a `QueryJobMetadataCorrupted` error
+- [RustTraining type-driven-correctness-book § Protocol Frame Layouts](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch15-const-fn-compile-time-correctness-proofs.html#protocol-frame-layouts): `const _: () = assert!(..)` pins a relation between constants
+
+## SRV-5: Retry only transient failures, with backoff, and only idempotent operations
+
+**Rule.** Retry through one helper that takes an `is_retriable` classifier, a finite attempt budget,
+and capped exponential backoff with jitter computed without overflow (see DEF-3). Retry only
+idempotent operations: reads, or writes keyed by a deterministic ID or an idempotency key. Let
+permanent errors bring the item to a terminal state. On the server side, an operation that may be
+replayed (start, cancel, terminate, fail) treats "already in the requested state, or past it" as
+success, recognised by a typed variant rather than by matching message text. Every loop that retries
+on error sleeps, including an ad-hoc `continue`.
+
+**Why.** Retrying every error turns permanent failures into hangs. clp's cancellation monitor
+retried a cancel that kept returning `JobNotFound`, so it got stuck on that job and blocked every
+later cancellation. Retrying a non-idempotent call after a lost response duplicates the work:
+Spider's `register_job` runs under `call_with_retry`, which also retries `Code::Unknown` transport
+failures that can happen after the server has committed. The classifier has to inspect the source
+chain, because tonic reports a dropped connection as `Code::Unknown` with a `transport::Error`
+source. The server side has to cooperate too. If a repeated `start_job` or cancel fails because the
+job already started or was already cancelled, a crash-recovery path turns into a permanent failure.
+Tasks that the scheduler may retry need deterministic output names (`{job_id}-{task_index}-{n}`), so
+that a retry overwrites its own output instead of leaving orphans.
+
+```rust,ignore
+// Bad
+loop {
+    match scheduler.next_task().await {
+        Ok(task) => run(task).await,
+        Err(_) => continue,
+    }
+}
+
+let archive_id = Uuid::new_v4();
+```
+
+```rust,ignore
+// Good
+let mut retry: u32 = 0;
+loop {
+    match scheduler.next_task().await {
+        Ok(task) => {
+            retry = 0;
+            run(task).await;
+        }
+        Err(e) if e.is_transient() => {
+            tracing::warn!(error = % e, "Scheduler returned a transient error. Retrying.");
+            tokio::time::sleep(backoff(retry, MAX_BACKOFF)).await;
+            retry = retry.saturating_add(1);
+        }
+        Err(e) => return Err(e.into()),
+    }
+}
+
+match self.start_job(job_id).await {
+    Ok(_) | Err(ClientError::InvalidJobState(_)) => {}
+    Err(e) => return Err(e.into()),
+}
+
+let archive_id = format!("{job_id}-{task_index}-{archive_index}");
+```
+
+**Review.**
+- For each retry loop or `call_with_retry`, check for a classifier (itself an exhaustive match), a
+  budget, a cap and jitter, and check that only the network round-trip sits inside the
+  retried closure, with serialization and decoding outside it.
+- Check that the retried operation is idempotent. Create, register or enqueue calls under retry need
+  an idempotency key or a deterministic ID. Otherwise make a single attempt.
+- In poll and recovery loops, a permanent error (`NotFound`, invalid state, corrupted metadata) must
+  finish the item instead of being retried on the next tick. Flag `let _ = op().await` used to make
+  a replay "idempotent". Match the one "already done" variant instead, and check that the variant
+  can only mean "already done or past it" (`InvalidJobState` from `start_job` qualifies only because
+  a job leaves `Ready` by being started or cancelled, and the next poll observes which).
+
+**Exceptions.** A long-running service loop, such as an execution manager polling its scheduler, may
+retry indefinitely, as long as it backs off and logs each failure.
+
+See also: pr-review.md § Don't silently swallow errors; OWN-4 (how the retried closure builds its
+future).
+
+**Sources.**
+
+- [y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4295898265): a non-transient "job not found" would stall the cancellation monitor forever
+- [y-scope/clp#2402](https://github.com/y-scope/clp/pull/2402#discussion_r3625635109): cap the initial poll backoff at the maximum backoff
+- [y-scope/clp#2589](https://github.com/y-scope/clp/pull/2589#discussion_r4350585449): cancelling an already cancelled job should return `Ok`
+- [y-scope/clp#2646](https://github.com/y-scope/clp/pull/2646#discussion_r4447938462): name archives `{compression-job-id}-{compression-task-index}-{archive-index-in-the-task}` instead of UUIDs
+- [y-scope/clp#2035](https://github.com/y-scope/clp/pull/2035): makes ingestion job termination idempotent
+- [y-scope/spider#396](https://github.com/y-scope/spider/pull/396#issuecomment-4974454267): tonic reports transport failures as `Unknown`, so those must retry too
+- [y-scope/spider#319](https://github.com/y-scope/spider/pull/319#discussion_r3222266574): make cancellation idempotent; check the DB before reporting job-not-found
+- [spider `spider-utils/src/grpc/retry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/grpc/retry.rs#L62-L86): `execute_with_retry`: classifier, retry budget, capped backoff
+- [spider `spider-client/src/grpc/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/grpc/job.rs#L78-L106): `JobOrchestrationClient::submit_job` runs `register_job` under `call_with_retry`
+- [spider `spider-execution-manager/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/runtime.rs#L335-L435): `Runtime::main_loop` `continue`s on a scheduler error without sleeping
+- [RustTraining async-book § Timeouts and Retries](https://microsoft.github.io/RustTraining/async-book/ch13-production-patterns.html#timeouts-and-retries): exponential backoff, plus jitter, for retried operations
+- [RustTraining rust-patterns-book § Implementing Your Own Higher-Order APIs](https://microsoft.github.io/RustTraining/rust-patterns-book/ch07-closures-and-higher-order-functions.html#implementing-your-own-higher-order-apis): a retry helper taking an `FnMut` and a `should_retry` classifier
 
 # Error handling
 
@@ -2316,8 +2434,7 @@ impl StorageServerError {
 ```
 
 Spider writes `is_fatal()` with `matches!`, as above. For a new classifier, prefer an exhaustive
-`match` that lists every variant, so that adding a variant forces a decision about its fatality
-(DEF-1).
+`match` that lists every variant, so that adding a variant forces a decision about its fatality.
 
 **Review.**
 - For every new variant, ask which category it belongs to and whether a client can reach it. If a
@@ -2332,11 +2449,19 @@ index the function has just bounds-checked (pr-review.md § Panic vs error retur
 error tier when the broken invariant lives in state that outlives the task: the cache, the DB, or a
 shared tree.
 
-**Sources.** spider components/spider-storage/src/cache/error.rs, spider
-components/spider-storage/src/state/error.rs, y-scope/spider#290, y-scope/spider#293,
-y-scope/spider#354, y-scope/spider#524, y-scope/spider#525, y-scope/spider#539. See also:
-pr-review.md § Panic vs error returns (this rule adds a third tier: a returned error that is fatal
-to the service), and DEF-6 (when to return an error and when to panic).
+See also: pr-review.md § Panic vs error returns (this rule adds a third tier: a returned error that
+is fatal to the service), and SRV-4 (when to return an error and when to panic).
+
+**Sources.**
+
+- [spider `spider-storage/src/cache/error.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/error.rs#L9-L175): `CacheError` combines `InternalError` and `StaleStateError`, each documenting its recovery contract
+- [spider `spider-storage/src/state/error.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/error.rs#L9-L53): `StorageServerError::is_fatal` decides fatality in one method
+- [y-scope/spider#290](https://github.com/y-scope/spider/pull/290): introduces the `CacheError` / `InternalError` / `StaleStateError` taxonomy
+- [y-scope/spider#293](https://github.com/y-scope/spider/pull/293#issuecomment-4173497229): internal errors act like panics and restart storage; stale-state errors are expected
+- [y-scope/spider#354](https://github.com/y-scope/spider/pull/354): a DB error inside a cache operation becomes a fatal `CacheError::Internal`
+- [y-scope/spider#524](https://github.com/y-scope/spider/pull/524): cancelling a `CommitReady` job no longer shuts storage down
+- [y-scope/spider#525](https://github.com/y-scope/spider/pull/525): outputs of an unsucceeded job become a stale-state error, not a shutdown
+- [y-scope/spider#539](https://github.com/y-scope/spider/pull/539): `Stopping` answers `UNAVAILABLE` before any fatal check
 
 ## ERR-2: Recover only from the variant you expect; propagate everything else
 
@@ -2385,20 +2510,25 @@ let ids = raw_ids
   or `filter_map(.. .ok())` on input → collect into `Result<Vec<_>, _>`, or match the recoverable
   kind.
 - A miss in a cache that holds only a subset (for example, live jobs) reported as `NotFound` → check
-  the source of truth before choosing between not-found and wrong-state (spider#535).
+  the source of truth before choosing between not-found and wrong-state
+  ([spider#535](https://github.com/y-scope/spider/pull/535)).
 
 **Exceptions.** In a best-effort loop (ERR-9), skipping bad items can be the documented policy. Log
 each skipped item with its ID and its error. `.ok()` is fine when "absent" and "invalid" really mean
 the same thing; say why in a comment.
 
-**Sources.** spider components/spider-storage/src/state/service.rs, spider
-components/spider-storage/src/db/mariadb/mysql_error.rs, y-scope/spider#535, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md, RustTraining
-c-cpp-book/src/ch09-error-handling.md, RustTraining
-csharp-book/src/ch09-1-crate-level-error-types-and-result-alias.md. See also: pr-review.md § Don't
-silently swallow errors (this rule adds the wrong-mapping case and the iterator form),
-coding-style.md § `map_err` for error translation (the downcast pattern), TYPE-4 and DEF-4 (absence
-and unknown input).
+See also: pr-review.md § Don't silently swallow errors (this rule adds the wrong-mapping case and
+the iterator form), coding-style.md § `map_err` for error translation (the downcast pattern), TYPE-4
+and SRV-2 (absence and unknown input).
+
+**Sources.**
+
+- [spider `spider-storage/src/state/service/state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/service/state.rs#L288-L366): `start_job` propagates DB errors; `cancel_job` still has the catch-all `_` arm
+- [spider `spider-storage/src/db/mariadb/mysql_error.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/mariadb/mysql_error.rs#L1-L92): named `MYSQL_ER_*` constants checked through a `MySqlDatabaseError` downcast
+- [y-scope/spider#535](https://github.com/y-scope/spider/pull/535): on a cache miss, check the DB and propagate other DB errors
+- [RustTraining type-driven-correctness-book § Parse, Don't Validate](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#parse-dont-validate): parse into a typed result once instead of checking and discarding
+- [RustTraining c-cpp-book § Rust error handling](https://microsoft.github.io/RustTraining/c-cpp-book/ch09-error-handling.html#rust-error-handling-3): shows `map_err(|_| ())` and `unwrap_or_default`, the forms this rule rejects
+- [RustTraining csharp-book § Error Recovery Patterns](https://microsoft.github.io/RustTraining/csharp-book/ch09-1-crate-level-error-types-and-result-alias.html#error-recovery-patterns): recover from `ErrorKind::NotFound` only, propagate everything else
 
 ## ERR-3: Add a variant only when a caller reacts differently, and give it typed fields
 
@@ -2408,14 +2538,20 @@ variants. It carries the facts the caller can't reconstruct (the ID, `{ from, to
 `type Error = String`, catch-all `Other(String)` variants, or fields that repeat what the caller
 passed in.
 
-**Why.** Callers can't recover from errors they can't tell apart. In y-scope/clp#2513, a finaliser
-had to tell "lost a race to a terminal state" from "the row is gone", but `SqlxNoRowsAffected` hid
-three different situations, so callers swallowed real problems. String payloads force callers and
-tests to match on message text, which spider#281 called "a code smell". Too many variants is also a
-failure: variants that no caller tells apart only add match arms and tests (spider#449). A variant
-named after a guessed cause, such as `IllegalResourceGroupId` for what may be a wrong password,
-sends operators down the wrong path (spider#464). Write the message for the condition the variant
-represents, not for the first call site, so it stays true when the variant is reused (spider#342).
+**Why.** Callers can't recover from errors they can't tell apart. In
+[y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#pullrequestreview-5286744460), a
+finaliser had to tell "lost a race to a terminal state" from "the row is gone", but
+`SqlxNoRowsAffected` hid three different situations, so callers swallowed real problems. String
+payloads force callers and tests to match on message text, which
+[spider#281](https://github.com/y-scope/spider/pull/281#discussion_r2734129660) called "a code
+smell". Too many variants is also a failure: variants that no caller tells apart only add match arms
+and tests ([spider#449](https://github.com/y-scope/spider/pull/449)). A variant named after a
+guessed cause, such as `IllegalResourceGroupId` for what may be a wrong password, sends operators
+down the wrong path
+([spider#464](https://github.com/y-scope/spider/pull/464#discussion_r3905746575)). Write the message
+for the condition the variant represents, not for the first call site, so it stays true when the
+variant is reused
+([spider#342](https://github.com/y-scope/spider/pull/342#pullrequestreview-4582419883)).
 
 ```rust,ignore
 // Bad
@@ -2460,16 +2596,27 @@ pub enum Error {
   fields.
 
 **Exceptions.** One variant with a detailed message is enough when no caller can act on the finer
-cause, for example "the task graph failed to deserialize" (spider#281). Errors that cross a process
-or FFI boundary, such as Spider's serializable `ExecutorError`, may be string-based. A custom
-`Deserialize` impl reports through `serde::de::Error::custom`, which carries only a message.
+cause, for example "the task graph failed to deserialize"
+([spider#281](https://github.com/y-scope/spider/pull/281#discussion_r2734247034)). Errors that cross
+a process or FFI boundary, such as Spider's serializable `ExecutorError`, may be string-based. A
+custom `Deserialize` impl reports through `serde::de::Error::custom`, which carries only a message.
 
-**Sources.** y-scope/clp#2513, y-scope/spider#281, y-scope/spider#283, y-scope/spider#309,
-y-scope/spider#342, y-scope/spider#449, y-scope/spider#464, y-scope/spider#480, spider
-components/spider-core/src/task/mod.rs, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md. See also:
-pr-review.md § `anyhow` vs custom errors, coding-style.md § API design (named fields over positional
-tuples).
+See also: pr-review.md § `anyhow` vs custom errors, coding-style.md § API design (named fields over
+positional tuples).
+
+**Sources.**
+
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#pullrequestreview-5286744460): `rows_affected == 0` hid "already terminated", "invalid transition" and "row is gone"
+- [y-scope/spider#281](https://github.com/y-scope/spider/pull/281#discussion_r2734129660): reviewer calls matching on error messages "a code smell"
+- [y-scope/spider#281](https://github.com/y-scope/spider/pull/281#discussion_r2734247034): one deserialization variant is enough when no caller acts on the cause
+- [y-scope/spider#283](https://github.com/y-scope/spider/pull/283#discussion_r2928368454): reviewer proposes typed `{ from, to }` and `{ current, expected }` fields
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309#discussion_r3131743631): drop `QueueType` from the error, since the caller knows the lane
+- [y-scope/spider#342](https://github.com/y-scope/spider/pull/342#pullrequestreview-4582419883): the message must describe the variant's condition, not its first call site
+- [y-scope/spider#449](https://github.com/y-scope/spider/pull/449): reuses `DispatchQueueClosed`; a variant no caller acted on was dropped
+- [y-scope/spider#464](https://github.com/y-scope/spider/pull/464#discussion_r3905746575): `IllegalResourceGroupId` may be a wrong password; rename it, drop the `String`
+- [y-scope/spider#480](https://github.com/y-scope/spider/pull/480): adds `ResourceGroupAlreadyExists` so callers can react to `ALREADY_EXISTS`
+- [spider `spider-core/src/task/mod.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/mod.rs#L8-L33): task `Error` with message-only variants for task graph deserialization
+- [RustTraining type-driven-correctness-book § Case Study: IPMI FRU Data](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#case-study-ipmi-fru-data): `FruError` variants carry typed `{ expected, actual }` fields
 
 ## ERR-4: Keep the cause attached; box it instead of turning it into a string or making the error generic
 
@@ -2486,8 +2633,9 @@ error enum just to hold a foreign error. Box the error instead, and bound generi
 `is_fatal()` or retry checks can't look inside text. `map_err(|_| ..)` loses even more:
 `env::var(..).map_err(|_| MissingEnvVar)` reports "not set" for a value that is set but isn't valid
 UTF-8. A type parameter on an error enum spreads into every event type, stream type and caller
-signature, just so the error can be logged in the end. y-scope/clp#2705 boxed the termination error
-so that `SessionEvent` stays non-generic. Boxing also keeps `Result` small, which
+signature, just so the error can be logged in the end.
+[y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705#discussion_r4568983772) boxed the
+termination error so that `SessionEvent` stays non-generic. Boxing also keeps `Result` small, which
 `clippy::result_large_err` checks. A message-only wrapper such as `#[error("failed to read config")]
 Io(#[from] io::Error)` removes the root cause from every `%` log line. Interpolating a `#[source]`
 field makes chain printers such as anyhow's `{:#}` show the cause twice; we accept that, because our
@@ -2535,12 +2683,17 @@ FFI or wire boundary, and only at that boundary. When one failure is fanned out 
 and the error isn't `Clone`, one owner keeps the typed error and the others may carry its message
 (`Session::fail` in the query result listener), or share it through an `Arc`.
 
-**Sources.** y-scope/clp#2705, clp components/clp-rust-libs/query-result-listener/src/error.rs, clp
-components/clp-rust-libs/query-result-listener/src/session.rs, spider
-components/spider-scheduler/src/core_impl/inbound_queue_reader.rs, spider
-components/spider-client/src/error.rs, spider components/spider-core/src/types/resource_group.rs,
-y-scope/spider#283, y-scope/spider#353, RustTraining
-type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md.
+**Sources.**
+
+- [y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705#discussion_r4568970549): reviewer asks to box the termination error instead of a type parameter
+- [clp `clp-rust-libs/query-result-listener/src/session/event.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/event.rs#L33-L44): `SessionEventError` boxes the termination error and keeps `JoinError` typed
+- [clp `clp-rust-libs/query-result-listener/src/session/state.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/state.rs#L118-L131): `State::fail` keeps the typed error once; the connection gets its message
+- [spider `spider-scheduler/src/core_impl/inbound_queue_reader.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/inbound_queue_reader.rs#L243-L304): `JoinError` stringified into `SchedulerError::Internal`, losing `is_panic()`
+- [spider `spider-client/src/error.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/error.rs#L3-L54): `String` variants and `to_transport_error(impl Display)` drop the typed cause
+- [spider `spider-core/src/types/resource_group.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/resource_group.rs#L51-L60): `env::var(..).map_err(|_| MissingEnvVar)` reports a non-UTF-8 value as unset
+- [y-scope/spider#283](https://github.com/y-scope/spider/pull/283#discussion_r2934491996): serde errors are boxed into `DbError` variants, not stringified
+- [y-scope/spider#353](https://github.com/y-scope/spider/pull/353): a small `UnpackError` keeps `Result` under `clippy::result_large_err`
+- [RustTraining type-driven-correctness-book § Error Type Hierarchies as Correctness](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-13--error-type-hierarchies-as-correctness): a nested `#[from]` keeps the cause typed instead of a string
 
 ## ERR-5: Handle an error once: return it, or log it where the decision is made
 
@@ -2553,11 +2706,15 @@ A helper returns `Result`; it doesn't log internally and then return `Option`.
 **Why.** The Spider scheduler core's error is logged three times: in `run`, in the spawn wrapper,
 and in `Runtime::stop`. One failure therefore looks like three incidents. A helper that logs and
 then returns `Option` hides which layer made the decision and leaves the caller unable to propagate
-the error or add context (y-scope/clp#2435). The outermost boundary is the last place where the job
-and task IDs are available. Spider's task runtime records only a status and a message, so a task
-that returns an error without logging leaves nothing to debug with (y-scope/clp#2646). `eprintln!`
-bypasses the file and collector sinks that tracing sets up (y-scope/clp#2286). In `main`, don't let
-both tracing and anyhow's `Termination` print the same error (y-scope/clp#1783).
+the error or add context
+([y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3736535562)). The outermost
+boundary is the last place where the job and task IDs are available. Spider's task runtime records
+only a status and a message, so a task that returns an error without logging leaves nothing to debug
+with ([y-scope/clp#2646](https://github.com/y-scope/clp/pull/2646#discussion_r4438107545)).
+`eprintln!` bypasses the file and collector sinks that tracing sets up
+([y-scope/clp#2286](https://github.com/y-scope/clp/pull/2286#discussion_r3352377854)). In `main`,
+don't let both tracing and anyhow's `Termination` print the same error
+([y-scope/clp#1783](https://github.com/y-scope/clp/pull/1783#discussion_r2624419610)).
 
 ```rust,ignore
 // Bad
@@ -2593,17 +2750,28 @@ let config: Config = match ZstdMsgpack::deserialize(&row.serialized_config) {
 - A task entry point, or a step in `main`, that exits through `?` with no log carrying its
   identifying fields → add `inspect_err` with those fields.
 - `eprintln!` or `println!` used to report an error → `tracing::error!`. A refactor that deletes a
-  log point → carry the log point over to the new code (y-scope/clp#2643).
+  log point → carry the log point over to the new code
+  ([y-scope/clp#2643](https://github.com/y-scope/clp/pull/2643#discussion_r4437040675)).
 
 **Exceptions.** A helper may log internally when it has to branch both its logging and its reaction
-on the error kind (`create_job_handle` in y-scope/clp#2435). An operation that is best-effort by
-design logs its own failure and returns `()` (ERR-9).
+on the error kind (`create_job_handle` in
+[y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3736535562)). An operation
+that is best-effort by design logs its own failure and returns `()` (ERR-9).
 
-**Sources.** spider components/spider-scheduler/src/runtime.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/implementation.rs,
-y-scope/clp#1740, y-scope/clp#1783, y-scope/clp#2286, y-scope/clp#2435, y-scope/clp#2643,
-y-scope/clp#2646, y-scope/spider#398. See also: coding-style.md § Log field formatting,
-coding-style.md § Error messages, TEST-9 (structured fields and spans).
+See also: coding-style.md § Log field formatting, coding-style.md § Error messages, TEST-9
+(structured fields and spans).
+
+**Sources.**
+
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L49-L164): the core's error is logged in the spawn wrapper and again in `Runtime::stop`
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/implementation.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/implementation.rs#L116-L157): `run` logs the error it also propagates
+- [y-scope/clp#1740](https://github.com/y-scope/clp/pull/1740#discussion_r2599931287): the error is already logged at the top level where the task is spawned
+- [y-scope/clp#1783](https://github.com/y-scope/clp/pull/1783#discussion_r2624419610): anyhow and tracing would both print the same error from `main`
+- [y-scope/clp#2286](https://github.com/y-scope/clp/pull/2286#discussion_r3352377854): use tracing, not stderr, so the logging framework catches the error
+- [y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3736535562): helpers return `Result` and the caller logs; `create_job_handle` is the exception
+- [y-scope/clp#2643](https://github.com/y-scope/clp/pull/2643#discussion_r4437040675): a log point dropped by the refactor should be added back
+- [y-scope/clp#2646](https://github.com/y-scope/clp/pull/2646#discussion_r4438107545): the task entry point should `inspect_err` with `job_id` and `task_id`
+- [y-scope/spider#398](https://github.com/y-scope/spider/pull/398): adds `inspect_err` logs to each fallible step of the storage `main`
 
 ## ERR-6: Translate errors to wire responses in one exhaustive place, without leaking internals
 
@@ -2615,12 +2783,16 @@ variants get specific codes and their `Display` text. Internal variants get a ge
 full error goes to the log.
 
 **Why.** With a catch-all arm, a new variant quietly gets `INTERNAL` and nobody decides whether it
-should be a 404, retryable, or fatal (spider scheduler grpc.rs). Fatal arms copied into each handler
-drift apart: one refactor made stray errors cancel the storage service in handlers where they should
-have been non-fatal (spider#364). Putting an internal error (SQL text, an AWS SDK error, a file
-path) in the response body exposes infrastructure details (y-scope/clp#1740). An arm for a variant
-that the path can't produce tells readers that it can happen (spider#369: "This can never happen for
-user-interfacing API").
+should be a 404, retryable, or fatal
+([spider scheduler grpc.rs](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/grpc.rs#L44-L111)).
+Fatal arms copied into each handler drift apart: one refactor made stray errors cancel the storage
+service in handlers where they should have been non-fatal
+([spider#364](https://github.com/y-scope/spider/pull/364#discussion_r3522530338)). Putting an
+internal error (SQL text, an AWS SDK error, a file path) in the response body exposes infrastructure
+details ([y-scope/clp#1740](https://github.com/y-scope/clp/pull/1740#discussion_r2599309102)). An
+arm for a variant that the path can't produce tells readers that it can happen
+([spider#369](https://github.com/y-scope/spider/pull/369#discussion_r3525890576): "This can never
+happen for user-interfacing API").
 
 ```rust,ignore
 // Bad
@@ -2660,10 +2832,18 @@ impl IntoResponse for Error {
 - An arm for a variant the endpoint can't produce, or a `cancel()` arm repeated across handlers →
   forward to the default handler.
 
-**Sources.** spider components/spider-scheduler/src/grpc.rs, spider
-components/spider-storage/src/grpc.rs, y-scope/spider#364, y-scope/spider#369, y-scope/spider#539,
-y-scope/clp#1740, y-scope/clp#2058, clp components/log-ingestor/src/routes.rs. See also: BND-9 (what
-each status code means across the system, and the client-side decoder).
+See also: BND-9 (what each status code means across the system, and the client-side decoder).
+
+**Sources.**
+
+- [spider `spider-scheduler/src/grpc.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/grpc.rs#L44-L111): `service_error_handler` ends in a catch-all `error =>` arm mapping to `INTERNAL`
+- [spider `spider-storage/src/grpc.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/grpc.rs#L386-L477): `default_error_handler` decides log level and fatal shutdown for forwarded errors
+- [y-scope/spider#364](https://github.com/y-scope/spider/pull/364#discussion_r3525523065): per-service handlers match their own errors and forward the rest to one default
+- [y-scope/spider#369](https://github.com/y-scope/spider/pull/369#discussion_r3525890576): reviewer flags an arm for a variant the user-facing API can't produce
+- [y-scope/spider#539](https://github.com/y-scope/spider/pull/539): every handler answers `Stopping` with `UNAVAILABLE`, never fatal
+- [y-scope/clp#1740](https://github.com/y-scope/clp/pull/1740#discussion_r2599309102): returning the serialized error could expose internal information
+- [y-scope/clp#2058](https://github.com/y-scope/clp/pull/2058#discussion_r2897700947): bad-request errors may show `Display`; internal errors stay behind a generic body
+- [clp `log-ingestor/src/routes.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/log-ingestor/src/routes.rs#L81-L107): `IntoResponse` maps each variant; internal errors get a generic body
 
 ## ERR-7: Return expected outcomes in `Ok`, and keep `Err` for failures
 
@@ -2677,11 +2857,14 @@ affected.
 **Why.** Spider's process pool returns `Result<Outcome, InternalError>`. With that split, `?` can't
 mix up "the user's task failed" (routine, reported) with "the pool is dead" (restart), and callers
 have to handle every outcome. Returning `Err` for "not applicable here" makes callers treat normal
-control flow as a failure and blocks reuse, for example from cleanup tasks (spider#390). The
-opposite mistake, an `Option` where the empty case is a failure, lets an empty input through as
-success (y-scope/clp#2643). An `UPDATE` that matches no row returns `Ok`, so cancelling a mistyped
-job ID returned 200 (y-scope/clp#1964). Sibling functions must agree: `get_status` and
-`request_cancellation` on a missing job should behave the same way (y-scope/clp#2617).
+control flow as a failure and blocks reuse, for example from cleanup tasks
+([spider#390](https://github.com/y-scope/spider/pull/390#discussion_r3567668760)). The opposite
+mistake, an `Option` where the empty case is a failure, lets an empty input through as success
+([y-scope/clp#2643](https://github.com/y-scope/clp/pull/2643#discussion_r4432515504)). An `UPDATE`
+that matches no row returns `Ok`, so cancelling a mistyped job ID returned 200
+([y-scope/clp#1964](https://github.com/y-scope/clp/pull/1964#pullrequestreview-3775154122)). Sibling
+functions must agree: `get_status` and `request_cancellation` on a missing job should behave the
+same way ([y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617#discussion_r4389499797)).
 
 ```rust,ignore
 // Bad
@@ -2726,11 +2909,19 @@ pub async fn execute(&self, request: ExecuteRequest) -> Result<Outcome, Internal
   outcomes into an `Ok` enum. If they have to stay mixed, document fatality on each variant and have
   callers match exhaustively.
 
-**Sources.** spider components/spider-execution-manager/src/process_pool.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs, clp
-components/api-server/src/webui_client/metadata.rs, y-scope/spider#390, y-scope/clp#1964,
-y-scope/clp#2058, y-scope/clp#2607, y-scope/clp#2617, y-scope/clp#2643. See also: TYPE-9 (named
-outcome enums instead of `bool`).
+See also: TYPE-9 (named outcome enums instead of `bool`).
+
+**Sources.**
+
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L66-L111): `Outcome` holds routine task results; `InternalError` holds pool failures
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs#L18-L40): `MakeAssignmentError` mixes routine outcomes and documents fatality per variant
+- [clp `api-server/src/webui_client/metadata.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/api-server/src/webui_client/metadata.rs#L553-L572): `From<TimeRangeRowProjection> for Option<TimeRange>` for legitimate absence
+- [y-scope/spider#390](https://github.com/y-scope/spider/pull/390#discussion_r3567668760): a query method returns `None` instead of failing, so cleanup tasks can reuse it
+- [y-scope/clp#1964](https://github.com/y-scope/clp/pull/1964#pullrequestreview-3775154122): cancelling a nonexistent job returns success
+- [y-scope/clp#2058](https://github.com/y-scope/clp/pull/2058#discussion_r2877153906): add `DatasetNotFound` so a missing dataset returns 404, not 500
+- [y-scope/clp#2607](https://github.com/y-scope/clp/pull/2607#discussion_r4381182000): `Option` for "no data yet"; `TryFrom<Error = ()>` plus `.ok()` looks like swallowing
+- [y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617#discussion_r4389499797): `get_status` and cancellation should treat a missing job the same way
+- [y-scope/clp#2643](https://github.com/y-scope/clp/pull/2643#discussion_r4432515504): with no inputs, return an error instead of `Option`
 
 ## ERR-8: Use `#[from]` only when the source type has one meaning; write `From` impls by hand when they carry policy
 
@@ -2743,11 +2934,12 @@ foreign enum, match every variant by name.
 **Why.** `ExecutorCreationFailure(#[from] std::io::Error)` labels the next unrelated I/O failure as
 a spawn failure. `From<rmp_serde::decode::Error>` mapping to `ErrorPayloadDeserializationFailure`
 mislabels every msgpack decode the same way. A blanket `#[from] io::Error` with no path field makes
-every `?` report "No such file" without saying which file. A hand-written
-`From<DbError> for CacheError` that routes to `Internal` makes the classification "a DB failure
-means the cache may be inconsistent" visible in the diff (spider#354). An exhaustive match means a
-variant added by a dependency upgrade has to be classified explicitly, instead of silently landing
-in the wrong bucket (y-scope/clp#2649).
+every `?` report "No such file" without saying which file. A hand-written `From<DbError> for
+CacheError` that routes to `Internal` makes the classification "a DB failure means the cache may be
+inconsistent" visible in the diff ([spider#354](https://github.com/y-scope/spider/pull/354)). An
+exhaustive match means a variant added by a dependency upgrade has to be classified explicitly,
+instead of silently landing in the wrong bucket
+([y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649)).
 
 ```rust,ignore
 // Bad
@@ -2790,14 +2982,21 @@ let child = command.spawn().map_err(PoolError::ExecutorCreationFailure)?;
   `?` compile → remove it.
 
 **Exceptions.** A single generic `impl<E> From<SdkError<E>>` is fine for an SDK whose error type is
-parameterized per operation, because the whole family has one meaning (y-scope/clp#1728). A
+parameterized per operation, because the whole family has one meaning
+([y-scope/clp#1728](https://github.com/y-scope/clp/pull/1728#discussion_r2594469214)). A
 `#[non_exhaustive]` foreign enum (`sqlx::Error`, `io::ErrorKind`) forces a `_` arm: name every
-variant you know, and send the `_` arm to the most conservative category, usually internal (DEF-1).
+variant you know, and send the `_` arm to the most conservative category, usually internal.
 
-**Sources.** spider components/spider-task-executor/src/error.rs, spider
-components/spider-execution-manager/src/process_pool.rs, y-scope/spider#354, y-scope/clp#2649,
-y-scope/clp#1728, RustTraining rust-patterns-book/src/ch15-crate-architecture-and-api-design.md. See
-also: coding-style.md § `map_err` for error translation.
+See also: coding-style.md § `map_err` for error translation.
+
+**Sources.**
+
+- [spider `spider-task-executor/src/error.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-task-executor/src/error.rs#L53-L69): blanket `From` impls, including `rmp_serde::decode::Error` to `ErrorPayloadDeserializationFailure`
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L85-L111): `ExecutorCreationFailure(#[from] std::io::Error)`, the pattern this rule flags
+- [y-scope/spider#354](https://github.com/y-scope/spider/pull/354): a hand-written `From<DbError> for CacheError` routes DB errors to `Internal`
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649): hand-written `From` impls name every `rmp` decode-error variant
+- [y-scope/clp#1728](https://github.com/y-scope/clp/pull/1728#discussion_r2594469214): one generic `From<SdkError<E>>` covers the whole AWS SDK error family
+- [RustTraining rust-patterns-book § Public API Design Checklist](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#public-api-design-checklist): a `#[non_exhaustive]` enum forces downstream `_` arms
 
 ## ERR-9: Make best-effort explicit in the signature
 
@@ -2810,13 +3009,16 @@ choice visible.
 
 **Why.** When callers routinely discard a `Result` with `let _ =`, some callers start propagating it
 while others drop it, so the same operation behaves differently depending on who calls it
-(spider#365). A `shutdown_and_join` that returns an error that has already been logged forces every
-caller to write a log-and-ignore arm, and that arm looks like a swallowed error (y-scope/clp#2035).
-On a failure path, cleanup of an external resource, such as cancelling the Spider job that a failed
-`start` left behind, must not replace the original error. Discarding the cleanup failure silently,
-though, hides why resources leak (y-scope/clp#2573). In a recovery loop, one bad config row
-shouldn't stop recovery of every other job, while a lost DB connection should trigger a restart
-(y-scope/clp#2053).
+([spider#365](https://github.com/y-scope/spider/pull/365#pullrequestreview-4602898177)). A
+`shutdown_and_join` that returns an error that has already been logged forces every caller to write
+a log-and-ignore arm, and that arm looks like a swallowed error
+([y-scope/clp#2035](https://github.com/y-scope/clp/pull/2035)). On a failure path, cleanup of an
+external resource, such as cancelling the Spider job that a failed `start` left behind, must not
+replace the original error. Discarding the cleanup failure silently, though, hides why resources
+leak ([y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4332285665)). In a
+recovery loop, one bad config row shouldn't stop recovery of every other job, while a lost DB
+connection should trigger a restart
+([y-scope/clp#2053](https://github.com/y-scope/clp/pull/2053#discussion_r2870591214)).
 
 ```rust,ignore
 // Bad
@@ -2855,11 +3057,19 @@ if let Err(e) = self.start(spider_job_id).await {
 - A loop over independent items that uses `?` and aborts after earlier items already had side
   effects → decide the policy. For best-effort, log each failed item with its ID and `continue`.
 
-**Sources.** y-scope/spider#341, y-scope/spider#365, y-scope/clp#1989, y-scope/clp#2035,
-y-scope/clp#2053, y-scope/clp#2573, clp components/log-ingestor/src/ingestion_job_manager.rs. See
-also: pr-review.md § Don't silently swallow errors (this rule is the case where discarding the error
-is the intended design, and says how to discard it), and ASYNC-3 (where a spawned task's failure
-goes).
+See also: pr-review.md § Don't silently swallow errors (this rule is the case where discarding the
+error is the intended design, and says how to discard it), and ASYNC-3 (where a spawned task's
+failure goes).
+
+**Sources.**
+
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341#pullrequestreview-4493746031): the GC handle shouldn't return errors; an actor failure fires the cancellation token
+- [y-scope/spider#365](https://github.com/y-scope/spider/pull/365#pullrequestreview-4602898177): `complete_task_assignment` should be best effort and not return an error
+- [y-scope/clp#1989](https://github.com/y-scope/clp/pull/1989#discussion_r2807733826): the S3 scanner's shutdown should stop returning an error
+- [y-scope/clp#2035](https://github.com/y-scope/clp/pull/2035): `shutdown_and_join` no longer returns errors
+- [y-scope/clp#2053](https://github.com/y-scope/clp/pull/2053#discussion_r2870591214): reviewer asks recovery to handle every job and give up only on failed ones
+- [y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4332285665): log the failed cleanup cancel with `inspect_err` instead of a bare `let _`
+- [clp `log-ingestor/src/ingestion_job_manager.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/log-ingestor/src/ingestion_job_manager.rs#L374-L418): best-effort recovery loop logs each failed job by ID and continues
 
 ## ERR-10: Give fallible trait methods an associated `Error` type
 
@@ -2867,13 +3077,15 @@ goes).
 declare `type Error: std::error::Error + Send + Sync + 'static;` and return `Result<_,
 Self::Error>`. When one trait binds another, tie their error types together (`type Encoder:
 ResultEncoder<Error = Self::Error>`). Infallible implementations use `std::convert::Infallible`
-(TLC-6).
+(TLC-5).
 
 **Why.** The trait author doesn't know every implementation, and an encoder that writes to a file or
 a stricter format can fail. An infallible signature then forces implementers to call `expect`. The
 panic kills the spawned connection task without telling the session's consumer, so results are
-silently lost and the job can still be reported as succeeded (y-scope/clp#2690, y-scope/clp#2702).
-With a typed error, the caller can fail the session and log the error where someone will see it.
+silently lost and the job can still be reported as succeeded
+([y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690#discussion_r4530595289),
+[y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702)). With a typed error, the caller can
+fail the session and log the error where someone will see it.
 
 ```rust,ignore
 // Bad
@@ -2912,11 +3124,15 @@ impl ResultEncoder for SseEncoder {
   bound, so callers can box and log the error (ERR-4).
 
 **Exceptions.** Don't make a method fallible "just in case": `take_batch` stayed infallible in
-y-scope/clp#2702 because no implementation can fail.
+[y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702) because no implementation can fail.
 
-**Sources.** y-scope/clp#2690, y-scope/clp#2702, clp
-components/clp-rust-libs/query-result-listener/src/encoding.rs. See also: pr-review.md § Panic vs
-error returns, TLC-6 (associated types and `Infallible`).
+See also: pr-review.md § Panic vs error returns, TLC-5 (associated types and `Infallible`).
+
+**Sources.**
+
+- [y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690#discussion_r4530595289): `ResultEncoder` should take an error type instead of panicking
+- [y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702): makes `ResultEncoder` fallible; `take_batch` stays infallible
+- [clp `clp-rust-libs/query-result-listener/src/encoding.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/encoding.rs#L5-L67): `ResultEncoding` ties its `Encoder`'s `Error` to its own
 
 # Designing types and their methods
 
@@ -3001,9 +3217,14 @@ DTOs, or raw configs that are validated into a `Validated*` type, may have `pub`
 
 See also: coding-style.md § Type-Level Validation, TYPE-2 and BND-1.
 
-**Sources.** y-scope/spider#390, y-scope/spider#397, y-scope/spider#280, y-scope/spider#281, spider
-components/spider-core/src/types/io/task_graph_input.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/implementation.rs
+**Sources.**
+
+- [y-scope/spider#390](https://github.com/y-scope/spider/pull/390): `TaskContext::new` checks the commit-outputs invariant; the accessor trusts it
+- [y-scope/spider#397](https://github.com/y-scope/spider/pull/397#pullrequestreview-4698875645): credentials resolved inside `serde` (`try_from` a raw type), not afterwards
+- [y-scope/spider#280](https://github.com/y-scope/spider/pull/280#issuecomment-3797846035): inserts one by one, so no task can reference a missing task
+- [y-scope/spider#281](https://github.com/y-scope/spider/pull/281): deserialization replays `insert_task` for each serialized `TaskDescriptor`
+- [spider `spider-core/src/types/io/task_graph_input.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/io/task_graph_input.rs#L128-L183): `TaskGraphInput`: private fields, invariant enforced by builder and decoder
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/implementation.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/implementation.rs#L45-L75): counterexample: every field `pub(super)` so tests can inspect state
 
 ## OBJ-2: Return a ready-to-use value from every factory function
 
@@ -3077,8 +3298,15 @@ let graph = match state {
 startup. Resolve it lazily, for example with a function returning `Result<&'static T, E>` over a
 `static OnceLock`, so that S3-only jobs don't fail when `/mnt/logs` is absent.
 
-**Sources.** y-scope/spider#283, y-scope/spider#285, y-scope/spider#339, y-scope/spider#524,
-y-scope/clp#1927, y-scope/clp#2661
+**Sources.**
+
+- [y-scope/spider#283](https://github.com/y-scope/spider/pull/283#discussion_r2920992760): a call-once init trait method belongs in the private factory
+- [y-scope/spider#285](https://github.com/y-scope/spider/pull/285#discussion_r2976155403): factory creates the pool and initializes tables before returning
+- [y-scope/spider#339](https://github.com/y-scope/spider/pull/339#discussion_r3383142317): restoring outputs wrote through a read-only reader handle
+- [y-scope/spider#339](https://github.com/y-scope/spider/pull/339#pullrequestreview-4471850284): don't mutate the task graph after construction; add per-case factories
+- [y-scope/spider#524](https://github.com/y-scope/spider/pull/524): recovered `CommitReady` job lacked its cleanup task; cancelling shut storage down
+- [y-scope/clp#1927](https://github.com/y-scope/clp/pull/1927#discussion_r2737006531): check the `Option` config once in the factory; wrap the `expect`
+- [y-scope/clp#2661](https://github.com/y-scope/clp/pull/2661#discussion_r4474008260): lazily initialized static mount point, so S3 jobs don't need it
 
 ## OBJ-3: Tie mandatory cleanup to a guard's `Drop`, and give the normal path a consuming method
 
@@ -3090,15 +3318,16 @@ path, and keep `Drop` as the synchronous, best-effort fallback that never blocks
 instead of discarding them.
 
 **Why.** An early `?`, a panic and a dropped future all skip a `close()` that callers have to
-remember. Before y-scope/clp#2702, dropping a session only unregistered it, and its open connections
-kept streaming. Spider's `PartialMutationGuard` turns "the cache was mutated but the DB write
-returned `Err` or was cancelled" from a silent inconsistency into a fatal shutdown, which recovery
-then repairs from the DB (DEF-2). `Drop` cannot `.await`, so the only async work it can start is a
-spawned task, and that task cannot report back: `tokio::spawn` panics if the value is dropped
-outside a runtime, and a `let _ =` inside the task swallows the one error the caller cared about.
-That is why awaited, fallible cleanup needs a consuming method the caller can `?`. Note also that
-`Drop::drop` runs before the struct's own fields are dropped, so a value that must be dropped after
-the guard's action, such as a reply sender that wakes a waiter, belongs inside the guard.
+remember. Before [y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702), dropping a session
+only unregistered it, and its open connections kept streaming. Spider's `PartialMutationGuard` turns
+"the cache was mutated but the DB write returned `Err` or was cancelled" from a silent inconsistency
+into a fatal shutdown, which recovery then repairs from the DB (DEF-1). `Drop` cannot `.await`, so
+the only async work it can start is a spawned task, and that task cannot report back: `tokio::spawn`
+panics if the value is dropped outside a runtime, and a `let _ =` inside the task swallows the one
+error the caller cared about. That is why awaited, fallible cleanup needs a consuming method the
+caller can `?`. Note also that `Drop::drop` runs before the struct's own fields are dropped, so a
+value that must be dropped after the guard's action, such as a reply sender that wakes a waiter,
+belongs inside the guard.
 
 ```rust,ignore
 // Bad
@@ -3161,14 +3390,20 @@ guard.disarm();
 See also: coding-style.md § Take ownership when the value mustn't be used afterwards (keep the state
 `Drop` needs in an `Option`; don't use `mem::forget` to skip `Drop`; spawning is for `Drop` only).
 
-**Sources.** y-scope/clp#2689, y-scope/clp#2702, y-scope/clp#2014, y-scope/clp#2286, spider
-components/spider-storage/src/partial_mutation.rs, spider
-components/spider-storage/src/state/tree_committer/mod.rs, spider
-components/spider-execution-manager/src/process_pool.rs, spider
-components/spider-execution-manager/src/runtime.rs, RustTraining
-async-book/src/ch12-common-pitfalls.md, RustTraining
-rust-patterns-book/src/ch07-closures-and-higher-order-functions.md, RustTraining
-rust-patterns-book/src/ch15-crate-architecture-and-api-design.md
+**Sources.**
+
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689): dropping a session unregisters it; dropping the listener stops accepting
+- [y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702): dropping a session now also cuts off its open connections
+- [y-scope/clp#2014](https://github.com/y-scope/clp/pull/2014#discussion_r2841594925): `sqlx::Transaction` rolls back on drop; no explicit `rollback` needed
+- [y-scope/clp#2286](https://github.com/y-scope/clp/pull/2286#discussion_r3364933661): `TelemetryGuard` is an RAII guard that shuts telemetry down on drop
+- [y-scope/clp#2286](https://github.com/y-scope/clp/pull/2286#discussion_r3364924355): log the drop-path shutdown failure with `tracing::error!`
+- [spider `spider-storage/src/partial_mutation.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/partial_mutation.rs#L8-L95): `PartialMutationGuard`: consuming `disarm`, fatal shutdown in `Drop`
+- [spider `spider-storage/src/state/tree_committer/mod.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/tree_committer/mod.rs#L168-L234): guard owns reply senders so they drop after `Drop::drop`
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L213-L289): `spawn_executor` sets `kill_on_drop(true)` on the child process
+- [spider `spider-execution-manager/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/runtime.rs#L87-L113): `Runtime` stores `_cancel_guard: DropGuard` for its token
+- [RustTraining async-book § No Async Drop](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#no-async-drop): `Drop` can't await; offer `async fn close(self)`, `Drop` as safety net
+- [RustTraining rust-patterns-book § The `with` Pattern — Bracketed Resource Access](https://microsoft.github.io/RustTraining/rust-patterns-book/ch07-closures-and-higher-order-functions.html#the-with-pattern--bracketed-resource-access): `with_*` bracketing; its teardown after `f()` is skipped on panic
+- [RustTraining rust-patterns-book § Public API Design Checklist](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#public-api-design-checklist): `#[must_use = "..."]` on guard types
 
 ## OBJ-4: Give a type exactly the dependencies it owns
 
@@ -3241,8 +3476,14 @@ fn submit(output_handle: OutputHandle, tasks: Vec<ArchiveSearchTask>) { /* ... *
 See also: coding-style.md § API design, coding-style.md § What deserves a unit test (no test-only
 seams in production code).
 
-**Sources.** y-scope/spider#341, y-scope/spider#418, y-scope/clp#2513, y-scope/clp#2504,
-y-scope/clp#2564
+**Sources.**
+
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341#pullrequestreview-4493746031): make the GC handle required; drop the test-only second constructor
+- [y-scope/spider#418](https://github.com/y-scope/spider/pull/418): log handle moves out of `ProcessPoolConfig` into a `ProcessPool::new` argument
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r4055064033): `OutputHandle` is per-job, so it doesn't belong in the shared context
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r3963934405): `archives_to_search` is the handle's own planning output, not a parameter
+- [y-scope/clp#2504](https://github.com/y-scope/clp/pull/2504#discussion_r3915961824): execution policy is per-task, so pair it with each archive
+- [y-scope/clp#2564](https://github.com/y-scope/clp/pull/2564): each archive's timeouts derive from that archive's own size
 
 ## OBJ-5: Share state through a cloneable handle over one private `Arc`
 
@@ -3319,11 +3560,19 @@ like `ShutdownHandle`'s token and fatal flag, does not need an extra `Arc<Inner>
 handlers and a background loop all write the shared state and its invariants span several fields,
 prefer a single owning actor (ASYNC-9).
 
-**Sources.** y-scope/spider#319, y-scope/spider#365, y-scope/spider#360, y-scope/spider#527,
-y-scope/spider#290, y-scope/spider#309, y-scope/clp#1740, spider
-components/spider-core/src/session.rs, spider components/spider-utils/src/shutdown.rs, RustTraining
-type-driven-correctness-book/src/ch16-send-sync-compile-time-concurrency-proofs.md, RustTraining
-c-cpp-book/src/ch17-best-practices.md
+**Sources.**
+
+- [y-scope/spider#319](https://github.com/y-scope/spider/pull/319#discussion_r3204135606): one `Arc<ServiceStateInner>` instead of cloning six `Arc`s
+- [y-scope/spider#365](https://github.com/y-scope/spider/pull/365#pullrequestreview-4602898177): reviewer adds an `inner` layer to the service state
+- [y-scope/spider#360](https://github.com/y-scope/spider/pull/360): `ConnectionPool` is a cheaply cloneable `Arc`-backed handle
+- [y-scope/spider#527](https://github.com/y-scope/spider/pull/527): `ShutdownHandle` replaces raw token use and records whether shutdown is fatal
+- [y-scope/spider#290](https://github.com/y-scope/spider/pull/290): `SharedTaskControlBlock` wraps the single-threaded `TaskControlBlock`
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309#discussion_r3107874938): name the inner `XXX` and the `Arc` wrapper `SharedXXX`
+- [y-scope/clp#1740](https://github.com/y-scope/clp/pull/1740#discussion_r2599395151): name the handle callers hold after the concept; inner gets `Inner`
+- [spider `spider-core/src/session.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/session.rs#L13-L68): `SessionTracker::try_advance` keeps the monotonic CAS protocol in one place
+- [spider `spider-utils/src/shutdown.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/shutdown.rs#L9-L58): `ShutdownHandle` pairs token and fatal flag without an `Arc<Inner>`
+- [RustTraining type-driven-correctness-book § Mutex Transforms !Sync into Sync](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch16-send-sync-compile-time-concurrency-proofs.html#mutex-transforms-sync-into-sync): data inside the `Mutex`, so the compiler forces locking
+- [RustTraining c-cpp-book § Memory Management](https://microsoft.github.io/RustTraining/c-cpp-book/ch17-best-practices.html#memory-management): keep interior mutability out of public APIs
 
 ## OBJ-6: Expose domain operations, not the container or the call protocol
 
@@ -3392,16 +3641,21 @@ pub fn create_ready_queue(
 alias that renames an external value type (`pub type UuidBytes = uuid::Bytes`) is fine. The rule
 targets aliases that name shared, mutable state.
 
-**Sources.** y-scope/clp#2689, y-scope/spider#449, y-scope/spider#309, y-scope/spider#443, spider
-components/spider-scheduler/src/dispatch_queue.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs
+**Sources.**
+
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689#discussion_r4507729225): make the registry a real type instead of a `DashMap` alias
+- [y-scope/spider#449](https://github.com/y-scope/spider/pull/449): `try_send` folds three call-site ordering rules into one method
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309#discussion_r3107834514): each ready-queue handle should hold only what its role needs
+- [y-scope/spider#443](https://github.com/y-scope/spider/pull/443): core owns a concrete `DispatchQueueWriter`; trait methods become inherent
+- [spider `spider-scheduler/src/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/dispatch_queue.rs#L50-L106): counterexample: `Clone` writer whose NOTE forbids concurrent calls
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs#L23-L81): non-`Clone` `RgDispatchQueueWriter` exposing only `try_send` and `queue_len`
 
 ## OBJ-7: Take required builder arguments up front and finish with a consuming `build(self)`
 
 **Rule.** Pass required values to the builder's own constructor (`Type::builder(required)`), and
 make optional settings consuming `#[must_use]` setters. `build(self)` is the only way to get the
 target: it runs any mandatory finalization itself and keeps those steps private. A fallible `add`
-validates its input before it changes any state (DEF-2).
+validates its input before it changes any state (DEF-1).
 
 **Why.** `CompressionInputBuilder` once had a public `flush(&mut self)` next to a consuming getter,
 so a caller who forgot to flush silently lost every buffered object. Finishing a builder through
@@ -3458,15 +3712,21 @@ let client = SpiderClient::builder(endpoint).max_retries(10).connect().await?;
 
 **Exceptions.** If a public builder has three or more required fields and leaving one out would
 silently produce an incomplete value, a typestate builder (`Builder<Missing>` → `Builder<Set<T>>`,
-with `build` only on the fully set state) is worth its extra type parameters (TLC-10). For one or
+with `build` only on the fully set state) is worth its extra type parameters (TLC-9). For one or
 two required fields, constructor arguments are enough.
 
 See also: coding-style.md § Take ownership when the value mustn't be used afterwards.
 
-**Sources.** y-scope/clp#2403, y-scope/clp#2620, y-scope/spider#396, y-scope/spider#374, spider
-components/spider-scheduler/src/runtime.rs, spider components/spider-storage/src/state/service.rs,
-RustTraining type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md,
-RustTraining csharp-book/src/ch05-1-constructor-patterns.md
+**Sources.**
+
+- [y-scope/clp#2403](https://github.com/y-scope/clp/pull/2403#pullrequestreview-4739365794): `flush` made private; `add` validates the bucket before mutating
+- [y-scope/clp#2620](https://github.com/y-scope/clp/pull/2620#discussion_r4414143465): finish a builder with `build`, not `Vec::from(builder)`
+- [y-scope/spider#396](https://github.com/y-scope/spider/pull/396): `SpiderClient::builder(endpoint)` with consuming setters replaces positional `connect`
+- [y-scope/spider#374](https://github.com/y-scope/spider/pull/374): `ServiceStateParams` bundles required arguments; `new` destructures it
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L109-L164): `create_runtime` destructures `RuntimeConfig` exhaustively
+- [spider `spider-storage/src/state/service/state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/service/state.rs#L72-L164): `ServiceStateParams`, destructured with no `..` in `ServiceState::new`
+- [RustTraining type-driven-correctness-book § Typestate Builder](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-4--typestate-builder): `build` exists only once every required field is set
+- [RustTraining csharp-book § Builder Pattern Implementation](https://microsoft.github.io/RustTraining/csharp-book/ch05-1-constructor-patterns.html#builder-pattern-implementation): consuming setters; its `build` returns `Err("Host is required")`, the flagged shape
 
 ## OBJ-8: Name methods for their contract
 
@@ -3509,8 +3769,14 @@ async fn delete_expired_terminated_jobs(&self, expire_after_sec: u64) -> Result<
 
 See also: coding-style.md § Rename a function once its behaviour narrows.
 
-**Sources.** y-scope/clp#2649, y-scope/clp#2617, y-scope/clp#2646, y-scope/spider#280,
-y-scope/spider#286
+**Sources.**
+
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4438359900): rename `expect_num_fields` to `check_num_fields`; `expect` implies a panic
+- [y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617#discussion_r4389439608): rename `cancel` to `request_cancellation`
+- [y-scope/clp#2646](https://github.com/y-scope/clp/pull/2646#discussion_r4438244070): a `finish_*` that starts the work should be `run_compression`
+- [y-scope/spider#280](https://github.com/y-scope/spider/pull/280#discussion_r2726264860): `compute` is misleading for a method that mutates the graph
+- [y-scope/spider#286](https://github.com/y-scope/spider/pull/286#discussion_r2947525390): replace `delete_all` with `delete_expired_terminated_jobs`
+- [y-scope/spider#286](https://github.com/y-scope/spider/pull/286#discussion_r2947548467): naming `reset_non_terminated_jobs` showed it does nothing; removed
 
 ## OBJ-9: Convert through the std traits
 
@@ -3583,8 +3849,15 @@ named method or factory, not `From` (see OBJ-7). `TryFrom<String>` is fine when
 See also: coding-style.md § What deserves a unit test (hand-written `From`/`TryFrom` impls that map
 fields are tested).
 
-**Sources.** y-scope/clp#2531, y-scope/clp#2550, y-scope/clp#2581, y-scope/spider#340,
-y-scope/spider#342, clp components/clp-rust-libs/clp-rust-utils/src/types.rs
+**Sources.**
+
+- [y-scope/clp#2531](https://github.com/y-scope/clp/pull/2531#discussion_r4075373368): `parse_str` misleads; use `from_str` or `TryFrom`
+- [y-scope/clp#2550](https://github.com/y-scope/clp/pull/2550): replaces `ArchiveId`'s `TryFrom<&str>` with `FromStr`
+- [y-scope/clp#2581](https://github.com/y-scope/clp/pull/2581#discussion_r4332827673): move call-site field mapping into `From<QueryConfig> for SearchJobConfig`
+- [y-scope/spider#340](https://github.com/y-scope/spider/pull/340#pullrequestreview-4489303309): replace `storage_error_to_liveness_error` with an `impl From`
+- [y-scope/spider#342](https://github.com/y-scope/spider/pull/342#discussion_r3478695903): the `ResponseUnpack` trait is literally `TryFrom`
+- [y-scope/spider#342](https://github.com/y-scope/spider/pull/342#discussion_r3482583018): use the crate's error enum, not `String` errors
+- [clp `clp-rust-libs/clp-rust-utils/src/types.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/clp-rust-utils/src/types.rs#L23-L44): `impl FromStr for ArchiveId`
 
 ## OBJ-10: Derive std traits when they are needed and when they mean the right thing
 
@@ -3650,8 +3923,9 @@ impl std::fmt::Debug for TreeEventKind {
 
 **Review.**
 - Flag derives with no user in the diff (bots often suggest `Debug, Clone, PartialEq, Eq` up front;
-  the team's answer in y-scope/spider#272 was "add it in future PRs on demand"), and derives such as
-  `strum::EnumIter` whose last user was removed.
+  the team's answer in
+  [y-scope/spider#272](https://github.com/y-scope/spider/pull/272#discussion_r2702772149) was "add
+  it in future PRs on demand"), and derives such as `strum::EnumIter` whose last user was removed.
 - Flag `Clone` on guards, tokens and single-writer handles, `Ord` on an enum with no stated order,
   `Default` for connections, handles, or configs with required fields, and a derived `Debug` on
   payload-carrying types that get logged.
@@ -3667,10 +3941,15 @@ aimed at `Clone`, `Copy`, `PartialEq`/`Eq`, `Hash`, `PartialOrd`/`Ord`, `Default
 See also: pr-review.md § Trait surface minimization (the same "only what callers use" logic, applied
 to traits).
 
-**Sources.** y-scope/spider#272, y-scope/spider#285, y-scope/spider#290, y-scope/spider#341, spider
-components/spider-storage/src/cache/tree/event.rs, RustTraining
-type-driven-correctness-book/src/ch03-single-use-types-cryptographic-guarantee.md, RustTraining
-c-cpp-book/src/ch17-best-practices.md
+**Sources.**
+
+- [y-scope/spider#272](https://github.com/y-scope/spider/pull/272#discussion_r2702772149): bot-suggested derives declined: "add it in future PRs on demand"
+- [y-scope/spider#285](https://github.com/y-scope/spider/pull/285#discussion_r2972593594): derive the enum's MySQL string support instead of hard-coding `'Ready'`
+- [y-scope/spider#290](https://github.com/y-scope/spider/pull/290): derives `Debug`/`Clone`/`Eq`/`PartialEq` on `TaskState` when the cache needs them
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341#pullrequestreview-4493746031): derive `Clone` instead of implementing it by hand
+- [spider `spider-storage/src/cache/tree/event.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/tree/event.rs#L91-L111): hand-written `Debug` logs output counts instead of payloads
+- [RustTraining type-driven-correctness-book § Move Semantics as Linear Types](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch03-single-use-types-cryptographic-guarantee.html#move-semantics-as-linear-types): single-use values are deliberately neither `Clone` nor `Copy`
+- [RustTraining c-cpp-book § When NOT to Implement Traits](https://microsoft.github.io/RustTraining/c-cpp-book/ch17-best-practices.html#when-not-to-implement-traits): no `Default` for handles or connections, no `Copy` on heap data
 
 # Ownership, borrowing and performance
 
@@ -3747,11 +4026,16 @@ impl ValueTypeDescriptor {
 `impl Into<..>` only on public entry points, where it saves a `.to_owned()` at every call site; in
 internal code each extra generic costs compile time and can break type inference at call sites.
 
-**Sources.** y-scope/spider#292, y-scope/spider#293, y-scope/spider#310, spider
-components/spider-core/src/task/type_descriptor.rs (`struct_from_name`), RustTraining
-rust-patterns-book/src/ch15-crate-architecture-and-api-design.md. See also: pr-review.md §
-Conversely: don't take ownership when a reference suffices, pr-review.md § Prefer references over
-`Arc`/`Vec` when ownership isn't needed.
+See also: pr-review.md § Conversely: don't take ownership when a reference suffices, pr-review.md §
+Prefer references over `Arc`/`Vec` when ownership isn't needed.
+
+**Sources.**
+
+- [y-scope/spider#292](https://github.com/y-scope/spider/pull/292#discussion_r3035019529): reviewer asks for `&TaskGraph`, since registration never runs detached
+- [y-scope/spider#293](https://github.com/y-scope/spider/pull/293#discussion_r3024970704): ready queue takes the `Vec` to send it without a copy
+- [y-scope/spider#310](https://github.com/y-scope/spider/pull/310#discussion_r3107608498): reviewer questions taking ownership of a record that is only read
+- [spider `spider-core/src/task/type_descriptor.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/type_descriptor.rs#L172-L187): `struct_from_name` takes `impl Into<String>` and stores it
+- [RustTraining rust-patterns-book § Quick Reference: Which to Use](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#quick-reference-which-to-use): own via `impl Into<T>` when storing, borrow when only reading
 
 ## OWN-2: Expose the borrowed view, not the container
 
@@ -3815,10 +4099,14 @@ let args = build_args(dataset.as_ref().map(NonEmptyString::as_str), archive_id.a
 **Exceptions.** Return an owned value when the getter computes it, or when the field is `Copy` or a
 cheap handle (`Arc`, a tonic client, a sqlx pool) that the caller is meant to keep.
 
-**Sources.** y-scope/clp#2512, spider components/spider-core/src/task/task_graph.rs
-(`get_parent_indices`, `get_task_graph_input_indices`), RustTraining
-csharp-book/src/ch07-3-smart-pointers-beyond-single-ownership.md. See also: coding-style.md § Use
-`&str` for read-only string access.
+See also: coding-style.md § Use `&str` for read-only string access.
+
+**Sources.**
+
+- [y-scope/clp#2512](https://github.com/y-scope/clp/pull/2512#discussion_r3982795813): reviewer explains why `Option<&str>` beats `&Option<NonEmptyString>` as a parameter
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L238-L241): `get_parent_indices` still returns `&Vec<TaskIndex>`
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L598-L609): `get_task_graph_input_indices` clones per task into a fresh `Vec`
+- [RustTraining csharp-book § Deref Coercion: Automatic Smart Pointer Unwrapping](https://microsoft.github.io/RustTraining/csharp-book/ch07-3-smart-pointers-beyond-single-ownership.html#deref-coercion-automatic-smart-pointer-unwrapping): why APIs take `&str`/`&[T]` rather than `&String`/`&Vec<T>`
 
 ## OWN-3: Consume at-most-once state with `Option::take` and `std::mem::take`/`replace`
 
@@ -3874,10 +4162,13 @@ pub(super) fn take_ready_tasks(&mut self) -> VecDeque<TaskIndex> {
 instead (see also: coding-style.md § Take ownership when the value mustn't be used afterwards, which
 also covers `take()` inside `Drop` types).
 
-**Sources.** y-scope/spider#430 (fixes y-scope/spider#429), spider
-components/spider-execution-manager/src/client/grpc/scheduler.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/job_registry.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs.
+**Sources.**
+
+- [y-scope/spider#430](https://github.com/y-scope/spider/pull/430): fix uses `Option::take` to send `prev_assignment` at most once
+- [y-scope/spider#429](https://github.com/y-scope/spider/issues/429): bug report: the `Copy` record is re-sent on every long-poll iteration
+- [spider `spider-execution-manager/src/client/grpc/scheduler.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/grpc/scheduler.rs#L55-L84): `next_task` long-poll loop with `prev_assignment.take()`
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/job_registry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/job_registry.rs#L70-L77): `take_ready_tasks` drains the queue with `std::mem::take`
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/scheduling_state.rs#L206-L223): `apply_downgrades` drains both buffers with `std::mem::take`
 
 ## OWN-4: Make a future-producing closure return an owned `async move` future
 
@@ -3928,23 +4219,28 @@ call_with_retry(self.retry_config, move || {
 
 **Review.**
 - In retry and poll closures, check that the returned future is `async move` and owns its inputs,
-  and that the helper's bound states `Send` on the future when callers spawn it. For a public async
-  API that must be spawnable, ask for a compile-time `Send` assertion on its futures, as
-  spider-client does (TLC-5); shared counters in such closures, including in tests, must be `Sync`
-  (`AtomicUsize`, not `Cell<usize>`).
+  and that the helper's bound states `Send` on the future when callers spawn it. For a public client
+  crate's async API, ask for a compile-time `Send` assertion on its futures, as spider-client does
+  (ASYNC-10). Shared counters in such closures, including in tests, must be `Sync` (`AtomicUsize`,
+  not `Cell<usize>`).
 - Compare each callback bound with how the body calls it: `FnOnce` if called once, `FnMut` if called
   repeatedly in sequence, `Fn` only for shared or concurrent calls, and `Send + 'static` only when
   the closure is spawned or stored. A stronger bound rejects valid closures and forces callers into
   `Arc`.
 
 **Exceptions.** Async callbacks that run in place and whose futures are never spawned may take
-`AsyncFnMut` (y-scope/clp#2224; see ASYNC-10).
+`AsyncFnMut` ([y-scope/clp#2224](https://github.com/y-scope/clp/pull/2224#discussion_r3144410113);
+see ASYNC-10).
 
-**Sources.** y-scope/spider#404, spider components/spider-utils/src/grpc/retry.rs, spider
-components/spider-client/src/grpc/job.rs, spider components/spider-client/src/client.rs
-(`assert_client_futures_send`), RustTraining
-rust-patterns-book/src/ch07-closures-and-higher-order-functions.md. See also: DEF-7 (what a retry
-helper must classify and bound).
+See also: SRV-5 (what a retry helper must classify and bound).
+
+**Sources.**
+
+- [y-scope/spider#404](https://github.com/y-scope/spider/pull/404): `AsyncFnMut` futures can't be bound `Send`; split into closure and future types
+- [spider `spider-utils/src/grpc/retry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/grpc/retry.rs#L107-L122): `call_with_retry` bounds `FnMut() -> FutureType` with `FutureType: Send`
+- [spider `spider-client/src/grpc/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/grpc/job.rs#L120-L134): `start_job` closure clones the pool and returns an `async move` block
+- [spider `spider-client/src/client.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/client.rs#L326-L349): `assert_client_futures_send` checks every public future is `Send`
+- [RustTraining rust-patterns-book § Fn, FnMut, FnOnce — The Closure Traits](https://microsoft.github.io/RustTraining/rust-patterns-book/ch07-closures-and-higher-order-functions.html#fn-fnmut-fnonce--the-closure-traits): which closure trait a callback bound should require
 
 ## OWN-5: Keep per-item hot paths borrowed and allocation-free in the common case
 
@@ -4002,10 +4298,13 @@ fn normalize_key(key: &str) -> Cow<'_, str> {
 **Exceptions.** Outside hot paths (config loading, one-off setup), a plain `String` return is fine;
 don't spread `Cow` through APIs where it buys nothing.
 
-**Sources.** y-scope/clp#2664, y-scope/clp#2690, clp
-components/clp-rust-libs/query-result-listener/src/encoding.rs (`ResultEncoder`), clp
-components/clp-rust-libs/query-result-listener/src/protocol.rs (`read_str`), RustTraining
-c-cpp-book/src/ch17-1-avoiding-excessive-clone.md.
+**Sources.**
+
+- [y-scope/clp#2664](https://github.com/y-scope/clp/pull/2664#discussion_r4474408651): reviewer proposes `encode(timestamp_millisecs, message: &str)` to encode from the buffer
+- [y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690): SSE encoder builds the per-connection prefix, including archive ID, once
+- [clp `clp-rust-libs/query-result-listener/src/encoding.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/encoding.rs#L21-L67): `ResultEncoder` takes the archive ID in `new`, borrowed parts in `encode`
+- [clp `clp-rust-libs/query-result-listener/src/protocol.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/protocol.rs#L284-L318): `read_str` returns `Cow`, allocating only for a lossy UTF-8 repair
+- [RustTraining c-cpp-book § When to use `Cow`](https://microsoft.github.io/RustTraining/c-cpp-book/ch17-1-avoiding-excessive-clone.html#when-to-use-cow): `Cow` when input usually passes unchanged; `String` or `&str` otherwise
 
 ## OWN-6: Don't force `Arc` on callers; make shared ownership opt-in
 
@@ -4050,10 +4349,14 @@ impl<LivenessClientType: LivenessClient + ?Sized> LivenessClient for Arc<Livenes
   bound and, if a caller needs sharing, the forwarding impl.
 - Flag `Arc::new(client)` where `client` is already a cheap `Clone` handle.
 
-**Sources.** y-scope/spider#362, spider components/spider-execution-manager/src/client/liveness.rs,
-spider components/spider-execution-manager/src/runtime.rs. See also: pr-review.md § Prefer
-references over `Arc`/`Vec` when ownership isn't needed, TLC-9 (when a blanket or forwarding impl is
-appropriate).
+See also: pr-review.md § Prefer references over `Arc`/`Vec` when ownership isn't needed, TLC-8 (when
+a blanket or forwarding impl is appropriate).
+
+**Sources.**
+
+- [y-scope/spider#362](https://github.com/y-scope/spider/pull/362): drops the forced `Arc` from the liveness API; adds forwarding impl
+- [spider `spider-execution-manager/src/client/liveness.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/liveness.rs#L99-L115): forwarding `impl LivenessClient for Arc<LivenessClientType>`
+- [spider `spider-execution-manager/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/runtime.rs#L145-L234): `Runtime::create` takes the liveness client by value with a `Clone` bound
 
 ## OWN-7: Treat a clone that silences the borrow checker as a design smell
 
@@ -4092,9 +4395,12 @@ fn report(&mut self) {
   review attention on clones that create a second copy of mutable state that is later updated on its
   own.
 
-**Sources.** RustTraining c-cpp-book/src/ch17-1-avoiding-excessive-clone.md, RustTraining
-c-cpp-book/src/ch16-cases-3-5-lifetime-borrowing.md. See also: pr-review.md § Conversely: don't take
-ownership when a reference suffices.
+See also: pr-review.md § Conversely: don't take ownership when a reference suffices.
+
+**Sources.**
+
+- [RustTraining c-cpp-book § Checklist: Should I clone?](https://microsoft.github.io/RustTraining/c-cpp-book/ch17-1-avoiding-excessive-clone.html#checklist-should-i-clone): borrow or restructure first; clone for `Arc`, threads, closures
+- [RustTraining c-cpp-book § Case Study 4: God object → Composable state](https://microsoft.github.io/RustTraining/c-cpp-book/ch16-cases-3-5-lifetime-borrowing.html#case-study-4-god-object--composable-state): split state structs so helpers borrow only the part they need
 
 ## OWN-8: Borrow with in-task concurrency; spawn only for parallelism or detachment
 
@@ -4142,9 +4448,11 @@ async fn lookup_all(&self, keys: &[String]) -> Vec<Entry> {
 work need `spawn`, and owned or `Arc` captures are correct there. Every such spawn needs an owner
 (ASYNC-3).
 
-**Sources.** spider components/spider-client/src/client.rs (`tokio::try_join!`), RustTraining
-async-book/src/ch09-when-tokio-isnt-the-right-fit.md, RustTraining
-async-book/src/ch16-summary-and-reference-card.md.
+**Sources.**
+
+- [spider `spider-client/src/client.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/client.rs#L296-L314): `SpiderClientBuilder::connect` connects both pools with `tokio::try_join!`
+- [RustTraining async-book § Alternatives to `tokio::spawn`](https://microsoft.github.io/RustTraining/async-book/ch09-when-tokio-isnt-the-right-fit.html#alternatives-to-tokiospawn): `FuturesUnordered` borrows items with no `spawn` and no `'static`
+- [RustTraining async-book § Decision Quick Reference](https://microsoft.github.io/RustTraining/async-book/ch16-summary-and-reference-card.html#decision-quick-reference): non-`'static` futures use `FuturesUnordered`; CPU-bound work goes elsewhere
 
 ## OWN-9: Model graphs as an owning arena with indices, not `Rc`/`Arc` links
 
@@ -4187,7 +4495,7 @@ mixed up with other indices (TYPE-3).
 **Review.**
 - Flag `Rc`/`Arc` fields that point at the node's own type, or at a type that points back.
 - Check that arena lookups use `get(index)`, returning `Option<&T>`, when the index can come from
-  outside; direct indexing is acceptable only for indices the arena itself produced (DEF-9). When
+  outside; direct indexing is acceptable only for indices the arena itself produced (DEF-4). When
   one structure holds two index spaces of the same integer type, ask for newtypes so they cannot be
   swapped.
 
@@ -4195,9 +4503,12 @@ mixed up with other indices (TYPE-3).
 one-directional `Arc` links are acceptable, as in spider's runtime task control blocks, which hold
 `Arc` handles to their children and only a counter of unfinished parents.
 
-**Sources.** spider components/spider-core/src/task/task_graph.rs, spider
-components/spider-storage/src/cache/task.rs (`TaskControlBlock`), RustTraining
-c-cpp-book/src/ch16-case-studies.md.
+**Sources.**
+
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L402-L409): `TaskGraph` owns all tasks in one `Vec<Task>`
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L185-L202): `Task` links neighbors by `parent_indices` and `child_indices`
+- [spider `spider-storage/src/cache/task.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/task.rs#L1093-L1107): `TaskControlBlock` holds child `Arc` handles and a parent counter
+- [RustTraining c-cpp-book § Case Study 2: shared_ptr tree → Arena/index pattern](https://microsoft.github.io/RustTraining/c-cpp-book/ch16-case-studies.html#case-study-2-shared_ptr-tree--arenaindex-pattern): replaces a `shared_ptr` tree with an arena and indices
 
 ## OWN-10: Use iterator adapters for pipelines and plain loops for multi-output state
 
@@ -4243,8 +4554,10 @@ let job_ids = raw_ids
 - Also flag the reverse: a `fold` or a long adapter chain carrying several outputs, side effects or
   `.await`s. Ask for a `for` loop.
 
-**Sources.** y-scope/spider#290, RustTraining
-rust-patterns-book/src/ch08-functional-vs-imperative-when-elegance-wins.md.
+**Sources.**
+
+- [y-scope/spider#290](https://github.com/y-scope/spider/pull/290#discussion_r2984258245): reviewer asks for `into_iter`, `filter` and `collect` over a loop
+- [RustTraining rust-patterns-book § Iterator Chains vs. Loops: The Decision Framework](https://microsoft.github.io/RustTraining/rust-patterns-book/ch08-functional-vs-imperative-when-elegance-wins.html#83-iterator-chains-vs-loops-the-decision-framework): when iterator chains win and when loops win
 
 # Async and concurrency
 
@@ -4323,11 +4636,14 @@ let num_bytes_read = tokio::select! {
   owner. The fix is to make that step synchronous, to record ownership first, or to move the whole
   step into a body the caller can't cancel (ASYNC-2).
 
-**Sources.** spider components/spider-scheduler/src/service.rs, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs,
-y-scope/clp#2676, y-scope/clp#2702, clp
-components/clp-rust-libs/query-result-listener/src/connection.rs, RustTraining
-async-book/src/ch12-common-pitfalls.md
+**Sources.**
+
+- [spider `spider-scheduler/src/service.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/service.rs#L79-L123): `next_task` dequeues, then awaits `registry.assign`: the unsafe window
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs#L462-L483): `Hint::consume_and_try_recv`, kept synchronous, with a `# Cancel safety` section
+- [y-scope/clp#2676](https://github.com/y-scope/clp/pull/2676#discussion_r4488180940): reviewer wants one `read_more`, so cancellation never covers a claimed batch's send
+- [y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702): races only socket reads against the session's end; claimed batches still go out
+- [clp `clp-rust-libs/query-result-listener/src/session/connection/mod.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/connection/mod.rs#L143-L219): `Connection::run` sends the pending batch, then races only `read_more`
+- [RustTraining async-book § Cancellation Hazards](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#cancellation-hazards)
 
 ## ASYNC-2: Run multi-step mutations where the caller can't cancel them
 
@@ -4337,13 +4653,15 @@ redo, or the body runs as a task in a `TaskTracker` owned by the service and the
 result. Never leave a multi-step mutation inside the handler future itself.
 
 **Why.** tonic (through hyper) drops the handler future when the client resets the stream, closes
-the connection, or its `grpc-timeout` expires. In Spider (#522) this could cut a handler off between
-the cache update and enqueuing the successor tasks. The job stayed `Running` until the next restart,
-and nothing was logged. Running the body as a spawned task makes its lifetime independent of the
+the connection, or its `grpc-timeout` expires. In Spider
+([#522](https://github.com/y-scope/spider/issues/522)) this could cut a handler off between the
+cache update and enqueuing the successor tasks. The job stayed `Running` until the next restart, and
+nothing was logged. Running the body as a spawned task makes its lifetime independent of the
 request. Spider's helper also holds a tracker token across the shutdown check, so
 `TaskTracker::wait()` can't return in the gap between the check and the spawn. It also wraps the
 handle in a guard whose `Drop` keeps watching the abandoned body. Without that guard, a dropped
-`JoinHandle` would discard a later panic or fatal error (#541).
+`JoinHandle` would discard a later panic or fatal error
+([#541](https://github.com/y-scope/spider/pull/541#discussion_r4381726163)).
 
 ```rust,ignore
 // Bad
@@ -4395,11 +4713,16 @@ async fn spawn_body<ReturnType: Send + 'static>(
 
 **Exceptions.** Read-only handlers. Loops where every write is a single-row transaction guarded by a
 status check, and restart recovery redoes interrupted work: there a plain `select!` on the
-cancellation token is enough. The query-coordinator cancellation monitor (y-scope/clp#2573) is an
-example.
+cancellation token is enough. The query-coordinator cancellation monitor
+([y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4332472724)) is an example.
 
-**Sources.** y-scope/spider#522, y-scope/spider#541, y-scope/spider#555, spider
-components/spider-storage/src/state/service.rs, y-scope/clp#2573
+**Sources.**
+
+- [y-scope/spider#522](https://github.com/y-scope/spider/issues/522): a dropped handler future leaves the job cache half-updated, stuck `Running`
+- [y-scope/spider#541](https://github.com/y-scope/spider/pull/541#discussion_r4381726163): reviewer: dropping `spawn_body` discards the body's later fatal error
+- [y-scope/spider#555](https://github.com/y-scope/spider/pull/555): splits `state/service.rs` into `state/service/`, where `spawn_body` now lives
+- [spider `spider-storage/src/state/service/state.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/service/state.rs#L1114-L1175): `ServiceState::spawn_body`: tracker token, shutdown check, drop guard
+- [y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4332472724): guarded single-row writes make cutting the monitor off mid-flight safe
 
 ## ASYNC-3: Give every spawned task an owner and a failure destination
 
@@ -4412,9 +4735,10 @@ task logs and returns `()` (ERR-9).
 **Why.** Dropping a `JoinHandle` does not cancel the task; it detaches it. A detached task keeps
 holding connections and locks after its owner is gone, it escapes graceful shutdown, and its panic
 or `Err` is never seen. Spider hit this several times. A GC loop and the task-instance pool exited
-on error, and nobody noticed until shutdown (#387, #391). A failed `resend_ready_tasks` left jobs
-stalled (#374). `tokio::time::timeout(d, handle)` is the same leak in disguise: on timeout it drops
-the handle, and the task keeps running.
+on error, and nobody noticed until shutdown ([#387](https://github.com/y-scope/spider/pull/387),
+[#391](https://github.com/y-scope/spider/pull/391)). A failed `resend_ready_tasks` left jobs stalled
+([#374](https://github.com/y-scope/spider/pull/374)). `tokio::time::timeout(d, handle)` is the same
+leak in disguise: on timeout it drops the handle, and the task keeps running.
 
 ```rust,ignore
 // Bad
@@ -4465,13 +4789,21 @@ match tokio::time::timeout(stop_timeout, &mut core_join_handle).await {
 example, Spider's stderr forwarder ends when `kill_on_drop` kills the child and closes the pipe.
 Also a join deadline that expires right before the process exits, since dropping the runtime aborts
 what is left. A temporary fire-and-forget is acceptable only when review explicitly acknowledges it,
-with a comment at the spawn site (y-scope/clp#1736). See also: pr-review.md § Don't silently swallow
-errors.
+with a comment at the spawn site
+([y-scope/clp#1736](https://github.com/y-scope/clp/pull/1736#discussion_r2595245383)). See also:
+pr-review.md § Don't silently swallow errors.
 
-**Sources.** y-scope/spider#374, y-scope/spider#387, y-scope/spider#391, y-scope/spider#309,
-y-scope/clp#1736, y-scope/clp#2705, spider components/spider-scheduler/src/runtime.rs, spider
-components/spider-execution-manager/src/process_pool.rs, RustTraining
-async-book/src/ch08-tokio-deep-dive.md
+**Sources.**
+
+- [y-scope/spider#374](https://github.com/y-scope/spider/pull/374): spawned ready-task resend cancels the service if it fails
+- [y-scope/spider#387](https://github.com/y-scope/spider/pull/387): background storage tasks exited silently on error; now they fire cancellation
+- [y-scope/spider#391](https://github.com/y-scope/spider/pull/391): the same fix for the scheduler core's task
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309#discussion_r3107850946): the service, not the queue, holds the abort handle and cancels before exit
+- [y-scope/clp#1736](https://github.com/y-scope/clp/pull/1736#discussion_r2595245383): reviewer explicitly accepts leaving the job detached for now
+- [y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705): the termination wait runs in a task that dropping the stream stops
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L138-L155): the core's spawn logs its error and cancels the runtime
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L436-L440): detached stderr forwarder whose end `kill_on_drop` guarantees
+- [RustTraining async-book § JoinHandle and Task Cancellation](https://microsoft.github.io/RustTraining/async-book/ch08-tokio-deep-dive.html#joinhandle-and-task-cancellation)
 
 ## ASYNC-4: Shut down through one token tree, with one deadline and an honest exit code
 
@@ -4488,13 +4820,15 @@ async-book/src/ch08-tokio-deep-dive.md
   deadline.
 
 **Why.** Kubernetes sends SIGTERM, not SIGINT. Binaries that handled only Ctrl-C used up the grace
-period and were SIGKILLed, losing buffered output (y-scope/spider#416). Spider-storage exited 0
-after a fatal error, so `on-failure` restart policies never fired. With no deadline, a single
-handler that never returned kept the process alive, and the open socket kept passing health checks
-(#527). Separate timers for each shutdown phase can add up past the orchestrator's kill deadline. A
-`let _ = timeout(.., join!(..))` that threw away the task results made a crashed pool look like a
-clean stop. Also, `JoinError` means "panicked *or* cancelled", so code that labels it as a panic
-reports the wrong cause (clp cd8eef5f).
+period and were SIGKILLed, losing buffered output
+([y-scope/spider#416](https://github.com/y-scope/spider/pull/416)). Spider-storage exited 0 after a
+fatal error, so `on-failure` restart policies never fired. With no deadline, a single handler that
+never returned kept the process alive, and the open socket kept passing health checks
+([#527](https://github.com/y-scope/spider/pull/527)). Separate timers for each shutdown phase can
+add up past the orchestrator's kill deadline. A `let _ = timeout(.., join!(..))` that threw away the
+task results made a crashed pool look like a clean stop. Also, `JoinError` means "panicked *or*
+cancelled", so code that labels it as a panic reports the wrong cause
+([clp cd8eef5f](https://github.com/y-scope/clp/pull/2705/commits/cd8eef5f5ec37303897ed66d8903fb2c31693545)).
 
 ```rust,ignore
 // Bad
@@ -4544,10 +4878,18 @@ cleanly.
   flag must be stored with `Release` before `cancel()` and loaded with `Acquire`. `stop` consumes
   `self`: see also coding-style.md § Take ownership when the value mustn't be used afterwards.
 
-**Sources.** y-scope/spider#341, y-scope/spider#346, y-scope/spider#368, y-scope/spider#416,
-y-scope/spider#418, y-scope/spider#527, spider components/spider-storage/src/state/runtime.rs,
-spider components/spider-storage/src/bin/grpc_server.rs, spider
-components/spider-utils/src/shutdown.rs, y-scope/clp commit cd8eef5f
+**Sources.**
+
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341): the job-cache GC loop gets a clone of the runtime's token
+- [y-scope/spider#346](https://github.com/y-scope/spider/pull/346#pullrequestreview-4554495319): the server stops on the token, so error handlers can end the runtime
+- [y-scope/spider#368](https://github.com/y-scope/spider/pull/368): one token shared by core and registry; `stop` joins the core under a timeout
+- [y-scope/spider#416](https://github.com/y-scope/spider/pull/416): adds `SIGTERM` listeners so Kubernetes termination is graceful
+- [y-scope/spider#418](https://github.com/y-scope/spider/pull/418): `Runtime::run` drops the process pool before joining the log actor
+- [y-scope/spider#527](https://github.com/y-scope/spider/pull/527): `ShutdownHandle` fatal flag, one 30 s deadline, non-zero `ExitCode`
+- [spider `spider-storage/src/state/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/runtime.rs#L69-L137): `Runtime::stop` joins everything under one timeout, fails on error or panic
+- [spider `spider-storage/src/bin/grpc_server.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/bin/grpc_server.rs#L154-L215): `wait_for_shutdown` shares one deadline across drain and stop, derives exit code
+- [spider `spider-utils/src/shutdown.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/shutdown.rs#L9-L58): `ShutdownHandle`: token plus fatal flag with `Release`/`Acquire`
+- [y-scope/clp commit cd8eef5f](https://github.com/y-scope/clp/pull/2705/commits/cd8eef5f5ec37303897ed66d8903fb2c31693545): renames `TerminationPanicked`, since the task can also be cancelled
 
 ## ASYNC-5: Never hold a lock across an `.await` that waits on someone else
 
@@ -4563,13 +4905,14 @@ components/spider-utils/src/shutdown.rs, y-scope/clp commit cd8eef5f
 error at `tokio::spawn`. If it does compile (on a current-thread runtime, or for a `Send` guard such
 as a `DashMap` shard lock), another task that tries to take the lock blocks its whole worker thread,
 or deadlocks the runtime if it is on the same thread. Spider replaced `DashMap` with
-`tokio::sync::RwLock<HashMap>` (#321) so that no shard lock is held across an `.await`. Spider's
-committer takes `job_execution_state.write()`. A handler that awaited the committer's reply while
-still holding the read guard would never get that reply, so `job.rs` drops the guard explicitly
-before submitting. A bounded `send` made while holding a cache lock deadlocked the inbound queue
-(#523, fixed in #526). Tokio's `RwLock` can't upgrade a read guard to a write guard. If you drop the
-read guard and then take the write guard, another task can change the state in between, so check it
-again under the write guard (DEF-3).
+`tokio::sync::RwLock<HashMap>` ([#321](https://github.com/y-scope/spider/pull/321)) so that no shard
+lock is held across an `.await`. Spider's committer takes `job_execution_state.write()`. A handler
+that awaited the committer's reply while still holding the read guard would never get that reply, so
+`job.rs` drops the guard explicitly before submitting. A bounded `send` made while holding a cache
+lock deadlocked the inbound queue ([#523](https://github.com/y-scope/spider/issues/523), fixed in
+[#526](https://github.com/y-scope/spider/pull/526)). Tokio's `RwLock` can't upgrade a read guard to
+a write guard. If you drop the read guard and then take the write guard, another task can change the
+state in between, so check it again under the write guard (DEF-2).
 
 ```rust,ignore
 // Bad
@@ -4601,7 +4944,8 @@ job.commit_outputs(new_outputs);
   await, or for the send to happen outside the lock.
 - Don't ask authors to remove an explicit `drop(guard)` that looks redundant.
   `clippy::significant_drop_tightening` asks for it, and it marks where the critical section ends
-  (y-scope/clp#1704, y-scope/spider#549).
+  ([y-scope/clp#1704](https://github.com/y-scope/clp/pull/1704#discussion_r2593538780),
+  [y-scope/spider#549](https://github.com/y-scope/spider/pull/549#discussion_r4436730894)).
 - Flag read-then-write sequences and wrappers that claim to "promote" a lock. The fix is a single
   write guard, or an accessor like `validate_and_write(check)` that checks the state again under the
   write guard.
@@ -4611,11 +4955,19 @@ serialize. Examples are Spider's `Mutex<Option<ExecutorHandle>>` in the process 
 means the pool is dead), and the execution-manager registry, which takes the table lock and then the
 entry lock and documents what that excludes.
 
-**Sources.** y-scope/spider#293, y-scope/spider#321, y-scope/spider#526, y-scope/spider#549,
-y-scope/clp#1704, y-scope/clp#2117, spider components/spider-storage/src/cache/job.rs, spider
-components/spider-scheduler/src/execution_manager_registry.rs, spider
-components/spider-execution-manager/src/process_pool.rs, RustTraining
-async-book/src/ch12-common-pitfalls.md
+**Sources.**
+
+- [y-scope/spider#293](https://github.com/y-scope/spider/pull/293#discussion_r3025264447): tokio can't promote locks; a wrapper would hide the guard being dropped
+- [y-scope/spider#293](https://github.com/y-scope/spider/pull/293#discussion_r3024975470): explicit `drop` before return shortens the critical section, per clippy
+- [y-scope/spider#321](https://github.com/y-scope/spider/pull/321): replaces `DashMap` so no shard lock is held across `.await`
+- [y-scope/spider#526](https://github.com/y-scope/spider/pull/526): makes inbound lanes unbounded so no send waits under a cache lock
+- [y-scope/spider#549](https://github.com/y-scope/spider/pull/549#discussion_r4436730894): author keeps an explicit `drop` because clippy flags its removal
+- [y-scope/clp#1704](https://github.com/y-scope/clp/pull/1704#discussion_r2593538780): explicit `drop` answers clippy's request to shorten the guard's lifetime
+- [y-scope/clp#2117](https://github.com/y-scope/clp/pull/2117#discussion_r2996931367): lock, check, then `drop` the guard before waiting again
+- [spider `spider-storage/src/cache/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/job.rs#L528-L591): `succeed_task_instance` drops the read guard before submitting to the committer
+- [spider `spider-scheduler/src/execution_manager_registry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/execution_manager_registry.rs#L163-L211): `upsert_em_state`: table lock, then entry lock, with what it excludes
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L154-L211): `ProcessPool::execute` holds the tokio mutex across the run; `None` means dead
+- [RustTraining async-book § Holding MutexGuard Across .await](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#holding-mutexguard-across-await)
 
 ## ASYNC-6: Bound every queue, and handle every channel outcome
 
@@ -4632,10 +4984,13 @@ async-book/src/ch12-common-pitfalls.md
 keeps the channel open, so the consumer loop never ends and shutdown hangs. `let _ = tx.send(..)`
 keeps a worker taking jobs whose results nobody will receive. Taking the permit *inside* the spawned
 task limits how many tasks run, but not how many exist. Polling with `try_acquire` turns the loop
-into a busy spin (y-scope/clp#2435). Spider documents each of its unbounded lanes, because the
-admission threshold already caps them and a bounded send made under a lock deadlocked (#526). A
+into a busy spin
+([y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3700473081)). Spider
+documents each of its unbounded lanes, because the admission threshold already caps them and a
+bounded send made under a lock deadlocked ([#526](https://github.com/y-scope/spider/pull/526)). A
 consumer that stops when the job's status says "done", instead of when the channel closes, loses a
-batch that was claimed but is still waiting for room in the channel (y-scope/clp#2702).
+batch that was claimed but is still waiting for room in the channel
+([y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702)).
 
 ```rust,ignore
 // Bad
@@ -4683,7 +5038,7 @@ jobs.spawn(async move {
   `let _ = tx.send(..)` in a producer, and channel loops that break on an out-of-band status. See
   also: pr-review.md § Don't silently swallow errors.
 - Flag `while let Ok(x) = rx.try_recv()` drain loops that have no cap on items or bytes per pass
-  (DEF-5). Put the cap in one owner, and move an item that doesn't fit back to the front of its
+  (SRV-3). Put the cap in one owner, and move an item that doesn't fit back to the front of its
   queue.
 - Flag semaphore permits acquired inside the spawned task, `try_acquire` polling loops, and
   configured limits that aren't validated against `Semaphore::MAX_PERMITS` (`Semaphore::new` panics
@@ -4694,12 +5049,18 @@ means the requester went away. Say so in a comment. An unbounded lane is right w
 exists elsewhere and a channel capacity could only reject sends the design depends on (Spider's
 inbound queue and per-group dispatch queues).
 
-**Sources.** y-scope/spider#309, y-scope/spider#526, y-scope/spider#557, y-scope/clp#2435,
-y-scope/clp#2702, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs, spider
-components/spider-execution-manager/src/executor_log_collection.rs, RustTraining
-rust-patterns-book/src/ch05-channels-and-message-passing.md, RustTraining
-async-book/src/ch13-production-patterns.md
+**Sources.**
+
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309#pullrequestreview-4122192679): a bounded buffer should block when full and unblock as the consumer progresses
+- [y-scope/spider#526](https://github.com/y-scope/spider/pull/526): unbounded lanes: jobs times tasks already bound them, and bounded sends deadlocked
+- [y-scope/spider#557](https://github.com/y-scope/spider/pull/557): a round takes at most 256 events; the pending queue alone owns the cap
+- [y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3716842837): get a permit before spawning, so the semaphore blocks task creation
+- [y-scope/clp#2435](https://github.com/y-scope/clp/pull/2435#discussion_r3700473081): acquiring a semaphore in a busy loop is not a good design
+- [y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702): the result stream's end, not the job's status, marks the end of results
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs#L83-L94): `DispatchQueueRegistry` documents why every queue is unbounded
+- [spider `spider-execution-manager/src/executor_log_collection.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/executor_log_collection.rs#L101-L105): `LINE_CHANNEL_CAP`: a named, deliberately bounded capacity for backpressure
+- [RustTraining rust-patterns-book § Bounded vs Unbounded and Backpressure](https://microsoft.github.io/RustTraining/rust-patterns-book/ch05-channels-and-message-passing.html#bounded-vs-unbounded-and-backpressure)
+- [RustTraining async-book § Backpressure with Bounded Channels](https://microsoft.github.io/RustTraining/async-book/ch13-production-patterns.html#backpressure-with-bounded-channels)
 
 ## ASYNC-7: Don't block the executor, and put a deadline on every external wait
 
@@ -4714,8 +5075,8 @@ starves. Throughput drops, timeouts fire late, or the service looks hung at 0% C
 compile and nothing is logged, so review is the only place this gets caught. Without a deadline, one
 peer that never answers holds a task, a permit or a lock forever. In Spider, the dispatch-queue
 registry owns both ends of its broadcast channel, so `recv()` can never return `None`. That makes a
-deadline mandatory there (#449). A separate `Timeout(Duration)` variant lets callers retry or report
-a timeout differently from a real failure.
+deadline mandatory there ([#449](https://github.com/y-scope/spider/pull/449)). A separate
+`Timeout(Duration)` variant lets callers retry or report a timeout differently from a real failure.
 
 ```rust,ignore
 // Bad
@@ -4748,17 +5109,24 @@ async fn load_manifest(&self, path: &Path) -> Result<Manifest, Error> {
   as literals. Config durations are whole seconds: see also coding-style.md § Prefer `u64` seconds
   over `Duration` for time config.
 - When a sync-only decoder has to consume an async stream (`rmp_serde` over an S3 `ByteStream`),
-  make the buffering deliberate and document its memory bound (y-scope/clp#1728). Never read
+  make the buffering deliberate and document its memory bound
+  ([y-scope/clp#1728](https://github.com/y-scope/clp/pull/1728#discussion_r2594459618)). Never read
   synchronously on the runtime thread to work around it.
 
 **Exceptions.** Short synchronous work, such as parsing a small payload or a short
 `std::sync::Mutex` section, is fine inline. A join deadline for an internal task may be a named
-constant, such as `CANCELLATION_MONITOR_JOIN_TIMEOUT` (y-scope/clp#2573).
+constant, such as `CANCELLATION_MONITOR_JOIN_TIMEOUT`
+([y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4298545773)).
 
-**Sources.** y-scope/spider#449, y-scope/clp#1728, y-scope/clp#2573, spider
-components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs, RustTraining
-async-book/src/ch12-common-pitfalls.md, RustTraining async-book/src/ch13-production-patterns.md,
-RustTraining async-book/src/ch14-async-is-an-optimization-not-an-architecture.md
+**Sources.**
+
+- [y-scope/spider#449](https://github.com/y-scope/spider/pull/449): the queue can't close while the registry lives, so `next_hint` takes a `wait_time`
+- [y-scope/clp#1728](https://github.com/y-scope/clp/pull/1728#discussion_r2594459618): sync `rmp_serde` over an S3 stream needs the whole file; document it
+- [y-scope/clp#2573](https://github.com/y-scope/clp/pull/2573#discussion_r4298545773): reviewer asks for a deadline on the monitor's join; 10 s hardcoded is fine
+- [spider `spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/resource_group_round_robin/dispatch_queue.rs#L203-L230): `next_hint` bounds the broadcast `recv` with `timeout`
+- [RustTraining async-book § Blocking the Executor](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#blocking-the-executor)
+- [RustTraining async-book § Timeouts and Retries](https://microsoft.github.io/RustTraining/async-book/ch13-production-patterns.html#timeouts-and-retries)
+- [RustTraining async-book § The `spawn_blocking` Smell](https://microsoft.github.io/RustTraining/async-book/ch14-async-is-an-optimization-not-an-architecture.html#the-spawn_blocking-smell)
 
 ## ASYNC-8: Write `biased;` when `select!` priority is part of correctness
 
@@ -4769,11 +5137,12 @@ explaining why the order matters.
 
 **Why.** `tokio::select!` picks at random among the branches that are ready. Without `biased;`, a
 connection of a session that has already failed can still be acknowledged, because its EOF happened
-to be polled first (y-scope/clp#2702). These races show up only some of the time: removing `biased`
-in #2702 failed the targeted test in only 7 of 12 runs, so a missing keyword gets past CI. `biased;`
-has a cost of its own: a branch that is always ready starves every branch after it. So list the
-rarely ready, must-win branches (cancellation, session end) first, and don't add `biased;` where
-fairness is the goal.
+to be polled first ([y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702)). These races show
+up only some of the time: removing `biased` in
+[#2702](https://github.com/y-scope/clp/pull/2702#pullrequestreview-5865892568) failed the targeted
+test in only 7 of 12 runs, so a missing keyword gets past CI. `biased;` has a cost of its own: a
+branch that is always ready starves every branch after it. So list the rarely ready, must-win
+branches (cancellation, session end) first, and don't add `biased;` where fairness is the goal.
 
 ```rust,ignore
 // Bad
@@ -4804,9 +5173,13 @@ tokio::select! {
 - Tests for ordering bugs must use real time and be run repeatedly before you trust them. See also:
   coding-style.md § Prefer real-time testing for complex async code.
 
-**Sources.** y-scope/clp#2702, y-scope/clp#2705, y-scope/spider#341, clp
-components/clp-rust-libs/query-result-listener/src/connection.rs, RustTraining
-async-book/src/ch12-common-pitfalls.md
+**Sources.**
+
+- [y-scope/clp#2702](https://github.com/y-scope/clp/pull/2702#pullrequestreview-5865892568): removing `biased` fails the targeted test in only 7 of 12 runs
+- [y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705): a session failure takes priority over an already available terminal status
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341): adds the job-cache GC loop's `select!` over shutdown, terminated jobs and ticks
+- [clp `clp-rust-libs/query-result-listener/src/session/connection/mod.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/connection/mod.rs#L202-L208): the EOF race under `biased`, end first, with the comment saying why
+- [RustTraining async-book § select! Fairness and Starvation](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#select-fairness-and-starvation)
 
 ## ASYNC-9: Give shared mutable state one owning actor
 
@@ -4822,11 +5195,16 @@ receives typed commands over a channel and runs a `select!` loop over shutdown, 
 
 **Why.** While each handler wrote a Spider job's state under its own locks, three race bugs reached
 production: a cancel racing a terminal failure, a cancel of a Ready job that had a cleanup task, and
-a failure that didn't cancel sibling tasks (#514, #516, #517). Making the tree committer the only
-writer turned these into ordered decisions made in one place (#551). A pool owned by one task needs
-no mutex, and its GC can't race registration (#310). The default `MissedTickBehavior::Burst` fires
-cycles back-to-back after a stall. After `close()`, `try_recv` can miss a send that is still in
-flight, and a request that was drained but never answered leaves its caller waiting forever.
+a failure that didn't cancel sibling tasks ([#514](https://github.com/y-scope/spider/issues/514),
+[#516](https://github.com/y-scope/spider/issues/516),
+[#517](https://github.com/y-scope/spider/issues/517)). Making the tree committer the only writer
+turned these into ordered decisions made in one place
+([#551](https://github.com/y-scope/spider/pull/551)). A pool owned by one task needs no mutex, and
+its GC can't race registration
+([#310](https://github.com/y-scope/spider/pull/310#discussion_r3107587053)). The default
+`MissedTickBehavior::Burst` fires cycles back-to-back after a stall. After `close()`, `try_recv` can
+miss a send that is still in flight, and a request that was drained but never answered leaves its
+caller waiting forever.
 
 ```rust,ignore
 // Bad
@@ -4884,13 +5262,20 @@ async fn run(mut self, shutdown: ShutdownHandle) -> Result<(), Error> {
 **Exceptions.** If the state has a trivial invariant and is touched only in short synchronous
 sections, a `std::sync::Mutex` behind a handle (OBJ-5) is simpler. If queued items must not be lost
 (a log sink), stop the actor by closing its channel rather than through cancellation, and treat the
-token as fire-only (y-scope/spider#418).
+token as fire-only ([y-scope/spider#418](https://github.com/y-scope/spider/pull/418)).
 
-**Sources.** y-scope/spider#309, y-scope/spider#310, y-scope/spider#418, y-scope/spider#546,
-y-scope/spider#549, y-scope/spider#551, spider components/spider-storage/src/task_instance_pool.rs,
-spider components/spider-storage/src/state/tree_committer/mod.rs, spider
-components/spider-execution-manager/src/liveness.rs, RustTraining
-rust-patterns-book/src/ch05-channels-and-message-passing.md
+**Sources.**
+
+- [y-scope/spider#309](https://github.com/y-scope/spider/pull/309#discussion_r3107850946): one coroutine owns all the receivers; the service holds its handle
+- [y-scope/spider#310](https://github.com/y-scope/spider/pull/310#discussion_r3107587053): a single coroutine owns the pool's state, so no mutex is needed
+- [y-scope/spider#418](https://github.com/y-scope/spider/pull/418): the log actor stops on channel closure; its token is fire-only
+- [y-scope/spider#546](https://github.com/y-scope/spider/pull/546): `TreeControlBlock::submit` queues events for the tree's one committer
+- [y-scope/spider#549](https://github.com/y-scope/spider/pull/549): adds the committer that applies tree events one round at a time
+- [y-scope/spider#551](https://github.com/y-scope/spider/pull/551): the committer becomes the only writer of a job's state, fixing three races
+- [spider `spider-storage/src/task_instance_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/task_instance_pool.rs#L261-L283): `TaskInstancePool` owns all pool state inside one spawned task
+- [spider `spider-storage/src/state/tree_committer/mod.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/tree_committer/mod.rs#L189-L220): `close_and_answer` closes, drains with `recv().await`, answers every event
+- [spider `spider-execution-manager/src/liveness.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/liveness.rs#L49-L80): `spawn` returns `(LivenessHandle, JoinHandle)` and sets `MissedTickBehavior::Skip`
+- [RustTraining rust-patterns-book § Actor Pattern with Channels](https://microsoft.github.io/RustTraining/rust-patterns-book/ch05-channels-and-message-passing.html#actor-pattern-with-channels)
 
 ## ASYNC-10: Design async APIs around laziness and `Send`
 
@@ -4898,17 +5283,20 @@ rust-patterns-book/src/ch05-channels-and-message-passing.md
 - If a call's side effect must happen when the call is made (enqueuing an event, reserving a slot),
   write a synchronous `fn` that performs it and then returns `impl Future<Output = _> + Send +
   use<>`. Don't write an `async fn` for this.
-- Public futures that callers may spawn must be `Send`, asserted at compile time for each method,
-  not only for the handle type (TLC-5).
+- Futures that callers may spawn must be `Send`. For traits with async methods, use
+  `#[async_trait]`, whose futures are `Send` by default. A public client crate, whose futures are
+  spawned only by other crates, asserts this at compile time for each async method, not only for
+  the handle type.
 
 **Why.** An `async fn` does nothing until it is polled. The order in which events reach the actor
 then depends on when callers poll, not on when they call, and a future that is dropped before it is
 polled never sends anything. With `use<>`, the returned future doesn't borrow `self`, so the caller
 can release locks on `self` before awaiting the reply. An async closure's future type can't be
 named, so it can't be given a `Send` bound. In Spider it silently became `!Send`, and `SpiderClient`
-calls could not be spawned on a multi-threaded runtime (#404). Checking only that the handle is
-`Send + Sync` doesn't catch that: a future that holds a non-`Send` value across an `.await` breaks
-spawnability while the handle stays `Send + Sync`.
+calls could not be spawned on a multi-threaded runtime
+([#404](https://github.com/y-scope/spider/pull/404)). Checking only that the handle is `Send + Sync`
+doesn't catch that: a future that holds a non-`Send` value across an `.await` breaks spawnability
+while the handle stays `Send + Sync`.
 
 ```rust,ignore
 // Bad
@@ -4934,22 +5322,30 @@ pub fn submit(&self, event: TreeEvent) -> impl Future<Output = TreeEventReply> +
 ```
 
 **Review.**
-- Async callbacks that run in place may take `AsyncFnMut` (y-scope/clp#2224). When the produced
-  future must be `Send` (it is spawned, or it backs a public client), use the
+- Async callbacks that run in place may take `AsyncFnMut`
+  ([y-scope/clp#2224](https://github.com/y-scope/clp/pull/2224#discussion_r3144410113)). When the
+  produced future must be `Send` (it is spawned, or it backs a public client), use the
   `FnMut() -> FutureType` bound with an owned `async move` future described in OWN-4 (Spider's
   `execute_with_retry`).
 - APIs that hand a future or closure to `tokio::spawn` should state `Send + 'static` on their own
-  signature, so a violation is reported at the caller. A public client should have one
-  `assert_send(&client.method(..))` per method, next to the `Send + Sync` assertion on the handle
-  (TLC-5 shows both).
+  signature, so a violation is reported at the caller. A public client crate should have one
+  `assert_send(&client.method(..))` per async method, next to a `const _` `Send + Sync` assertion
+  on the handle, as `spider-client` does. Inside a workspace, the crate's own `tokio::spawn` calls
+  already check this, so other types need no assertion.
+- Flag `#[async_trait(?Send)]` on a trait whose futures are spawned or held across tasks.
 - Flag a call to an `async fn` whose result is never awaited or spawned, and an `async fn` whose
   first statement is a send or reservation that callers expect to happen at call time.
 
-**Sources.** y-scope/spider#404, y-scope/spider#546, y-scope/clp#2224, spider
-components/spider-storage/src/cache/tree/control_block.rs, spider
-components/spider-utils/src/grpc/retry.rs, spider components/spider-client/src/client.rs,
-RustTraining type-driven-correctness-book/src/ch16-send-sync-compile-time-concurrency-proofs.md,
-RustTraining async-book/src/ch12-common-pitfalls.md
+**Sources.**
+
+- [y-scope/spider#404](https://github.com/y-scope/spider/pull/404): async closures' futures can't be bounded `Send`; adds per-method assertions
+- [y-scope/spider#546](https://github.com/y-scope/spider/pull/546): `submit` queues the event at the call and returns a future of the reply
+- [y-scope/clp#2224](https://github.com/y-scope/clp/pull/2224#discussion_r3144410113): `AsyncFnMut` is preferred but hits the HRTB `Send` pitfall
+- [spider `spider-storage/src/cache/tree/control_block.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/tree/control_block.rs#L50-L93): `TreeControlBlock::submit`: sync fn returning `impl Future + Send + use<>`
+- [spider `spider-utils/src/grpc/retry.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/src/grpc/retry.rs#L33-L86): `execute_with_retry` takes `FnMut() -> FutureType` with `FutureType: Send`
+- [spider `spider-client/src/client.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/client.rs#L319-L349): `Send + Sync` assertion on the handles plus one `assert_send` per method
+- [RustTraining type-driven-correctness-book § Function Bounds as Theorems](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch16-send-sync-compile-time-concurrency-proofs.html#function-bounds-as-theorems)
+- [RustTraining async-book § Holding MutexGuard Across .await](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#holding-mutexguard-across-await): a non-`Send` value held across `.await` only fails at `spawn`
 
 # Serialization, config and external boundaries
 
@@ -4973,9 +5369,11 @@ deep in business logic as a `None` or a panic instead of as one parse error at l
 separate `validate()` step, an invalid value exists for a while and leaks wherever someone forgets
 the call. It also splits the checks across layers: in the API server, `max_num_results` was rejected
 during deserialization while the bucket size was checked later in the handler, so the same kind of
-mistake got a different status code and message (raised in review of y-scope/clp#2567, fixed in
-y-scope/clp#2581). With `try_from`, the deserialized value is valid by construction, the error names
-the offending value and its position, and there is only one validation code path.
+mistake got a different status code and message (raised in review of
+[y-scope/clp#2567](https://github.com/y-scope/clp/pull/2567#discussion_r4277862603), fixed in
+[y-scope/clp#2581](https://github.com/y-scope/clp/pull/2581)). With `try_from`, the deserialized
+value is valid by construction, the error names the offending value and its position, and there is
+only one validation code path.
 
 ```rust,ignore
 // Bad
@@ -5046,12 +5444,18 @@ loader. When a type's invariants are enforced as it is built up piece by piece (
 See also: coding-style.md § Type-Level Validation, TYPE-1 (parse at the boundary) and TYPE-2 (seal
 every construction path).
 
-**Sources.** y-scope/clp#2567, y-scope/clp#2572, y-scope/clp#2581, y-scope/clp#2484, clp
-components/clp-rust-libs/clp-rust-utils/src/job_config/search.rs, clp
-components/clp-rust-libs/clp-rust-utils/src/types.rs, spider
-components/spider-core/src/task/task_graph.rs, y-scope/spider#320, RustTraining
-type-driven-correctness-book/src/ch07-validated-boundaries-parse-dont-validate.md, RustTraining
-type-driven-correctness-book/src/ch17-redfish-applied-walkthrough.md.
+**Sources.**
+
+- [y-scope/clp#2567](https://github.com/y-scope/clp/pull/2567#discussion_r4277862603): reviewer notes the two fields are validated at different stages
+- [y-scope/clp#2572](https://github.com/y-scope/clp/issues/2572): asks for one status code and error format for invalid values
+- [y-scope/clp#2581](https://github.com/y-scope/clp/pull/2581): rejects invalid bucket sizes with the same 422 as `max_num_results`
+- [y-scope/clp#2484](https://github.com/y-scope/clp/pull/2484#discussion_r3818189641): reviewer: an unvalidated bucket size gets a 200, then the job fails
+- [clp `clp-rust-libs/clp-rust-utils/src/job_config/search.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/clp-rust-utils/src/job_config/search.rs#L55-L115): `TimeRange` deserialized through `try_from = "UncheckedTimeRange"`
+- [clp `clp-rust-libs/clp-rust-utils/src/types.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/clp-rust-utils/src/types.rs#L140-L183): `PositiveI64` with `try_from = "NonZeroU64"` and `into = "i64"`
+- [spider `spider-core/src/task/task_graph.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/task/task_graph.rs#L956-L1063): `TaskGraphVisitor` replays the checked `TaskGraph::new` and `insert_task`
+- [y-scope/spider#320](https://github.com/y-scope/spider/pull/320#discussion_r3211197530): reviewer: name the checking constructor `create`, not `validate`
+- [RustTraining type-driven-correctness-book § Parse, Don't Validate](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch07-validated-boundaries-parse-dont-validate.html#parse-dont-validate): parse once into a type that carries validity
+- [RustTraining type-driven-correctness-book § The Untyped Redfish Client](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch17-redfish-applied-walkthrough.html#the-untyped-redfish-client): indexing `serde_json::Value` with `unwrap()` at every use
 
 ## BND-2: Reject unknown keys in every schema you own, and tag enums explicitly
 
@@ -5069,7 +5473,8 @@ checks only the keys next to `tag` and `content`, so the variant's own struct ne
 too. An untagged enum tries variants in order: a payload that also fits an earlier variant decodes
 as the wrong one, and a payload that fits none gets only "data did not match any variant". With our
 YAML crate (`yaml_serde`), an externally tagged enum accepts only a YAML tag such as `!RoundRobin`
-and rejects the nested-map form, and Helm values cannot express YAML tags (y-scope/spider#412).
+and rejects the nested-map form, and Helm values cannot express YAML tags
+([y-scope/spider#412](https://github.com/y-scope/spider/pull/412)).
 
 ```rust,ignore
 // Bad
@@ -5118,11 +5523,20 @@ unknown keys or unknown tags are rejected; that is declarative serde behavior.
 
 See also: coding-style.md § Mirroring Python Types, coding-style.md § What deserves a unit test.
 
-**Sources.** spider components/spider-scheduler/src/config.rs, spider
-components/spider-scheduler/src/runtime.rs, spider components/spider-storage/src/config.rs, spider
-components/spider-storage/src/state/runtime.rs, y-scope/spider#412, y-scope/spider#433,
-y-scope/clp#1663, y-scope/clp#1828, y-scope/clp#2452, y-scope/clp#2613, y-scope/clp#2652,
-RustTraining rust-patterns-book/src/ch11-serialization-zero-copy-and-binary-data.md.
+**Sources.**
+
+- [spider `spider-scheduler/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/config.rs#L36-L50): `SchedulerConfig` adjacently tagged with `deny_unknown_fields`
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L24-L40): `RuntimeConfig` has `#[serde(default)]` fields but no `deny_unknown_fields`
+- [spider `spider-storage/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/config.rs#L74-L80): `DatabasePoolConfig` pairs struct-level `default` with `deny_unknown_fields`
+- [spider `spider-storage/src/state/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/runtime.rs#L32-L40): `RuntimeConfig` has defaulted sections but no `deny_unknown_fields`
+- [y-scope/spider#412](https://github.com/y-scope/spider/pull/412): externally tagged enum needs YAML tags; switches to adjacent tagging
+- [y-scope/spider#433](https://github.com/y-scope/spider/pull/433): renaming config keys breaks old configs; Helm values updated in lockstep
+- [y-scope/clp#1663](https://github.com/y-scope/clp/pull/1663#discussion_r2562757119): reviewer adds `deny_unknown_fields` to the API's `QueryConfig`
+- [y-scope/clp#1828](https://github.com/y-scope/clp/pull/1828#issuecomment-3720487052): schema change without a Helm update fails deployments with "missing field"
+- [y-scope/clp#2452](https://github.com/y-scope/clp/pull/2452#discussion_r3725303501): reviewer: the Rust mirror of the changed Python config wasn't updated
+- [y-scope/clp#2613](https://github.com/y-scope/clp/pull/2613#discussion_r4383980759): reviewer adds `deny_unknown_fields` to a new job-config struct
+- [y-scope/clp#2652](https://github.com/y-scope/clp/pull/2652): `QueryOutput` tagged by `type`; every config struct denies unknown fields
+- [RustTraining rust-patterns-book § Enum Representations](https://microsoft.github.io/RustTraining/rust-patterns-book/ch11-serialization-zero-copy-and-binary-data.html#enum-representations): the four serde enum representations and when to use each
 
 ## BND-3: Guard read-then-write DB transitions in the statement itself
 
@@ -5130,17 +5544,22 @@ RustTraining rust-patterns-book/src/ch11-serialization-zero-copy-and-binary-data
 check `rows_affected()`. The preconditions are the valid previous states and, where writers can be
 superseded, the writer's session or fence. If a transaction must read a value before deciding what
 to write, read it with `SELECT ... FOR UPDATE` (or `LOCK IN SHARE MODE` when nothing in the
-transaction later writes that row). Each storage method is one transaction, and a failed call leaves
-no side effects.
+transaction later writes that row). Failure paths are no exception: marking a job failed also names
+the states it may move from. Each storage method is one transaction, and a failed call leaves no
+side effects.
 
 **Why.** In InnoDB and MariaDB, a plain `SELECT` inside a transaction reads a snapshot and takes no
 lock. The team once assumed otherwise, and the resulting inconsistent status check needed a
-dedicated fix (y-scope/clp#2045). Read, check in Rust, then write is a TOCTOU race, and upgrading a
-shared lock to an exclusive one deadlocks under concurrency, which is why spider's transitions bind
-both the expected and the target state (y-scope/spider#283). An ownership check done only in memory
-let a superseded storage process keep committing transitions after its replacement took over, so
-jobs ran twice; the fix fences every write in SQL (issue y-scope/spider#520, fixed in
-y-scope/spider#532).
+dedicated fix ([y-scope/clp#2045](https://github.com/y-scope/clp/pull/2045)). Read, check in Rust,
+then write is a TOCTOU race, and upgrading a shared lock to an exclusive one deadlocks under
+concurrency, which is why spider's transitions bind both the expected and the target state
+([y-scope/spider#283](https://github.com/y-scope/spider/pull/283#discussion_r2921926472)). An
+ownership check done only in memory let a superseded storage process keep committing transitions
+after its replacement took over, so jobs ran twice; the fix fences every write in SQL (issue
+[y-scope/spider#520](https://github.com/y-scope/spider/issues/520), fixed in
+[y-scope/spider#532](https://github.com/y-scope/spider/pull/532)). In clp, marking a query job failed
+"regardless of its current status" could overwrite a terminal `Cancelled` set by the API server
+([y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r4077243068)).
 
 ```rust,ignore
 // Bad
@@ -5175,6 +5594,9 @@ if result.rows_affected() != 1 {
 - In every read-then-write transaction, ask which lock each read holds. Flag a decision made from an
   unlocked `SELECT`, an `UPDATE` whose `WHERE` omits the expected state or the writer's fence, and
   an `UPDATE` that ignores `rows_affected()`.
+- Treat a `rows_affected()` mismatch as a corruption error such as `CorruptedDbState`, not a silent
+  skip. A second "confirmation" `SELECT` that could only disagree if the DB were corrupt adds round
+  trips and locks without adding safety.
 - Flag a storage method split into several transactions without a measured reason and a docstring
   stating what a partial failure leaves behind.
 - Flag `ON UPDATE CURRENT_TIMESTAMP` on columns with a meaning (`end_at`, `death_confirmed_at`);
@@ -5184,12 +5606,26 @@ if result.rows_affected() != 1 {
 **Exceptions.** Large `IN` lists may be batched in bounded transactions; the method's docstring then
 says it is not atomic.
 
-See also: coding-style.md § SQL and Database Patterns, DEF-3 (atomic check-then-act in memory and in
-the DB).
+See also: coding-style.md § SQL and Database Patterns, DEF-2 (the same race in memory).
 
-**Sources.** y-scope/clp#2045, y-scope/clp#2038, y-scope/spider#283, y-scope/spider#292,
-y-scope/spider#314, y-scope/spider#450, y-scope/spider#493, y-scope/spider#520, y-scope/spider#532,
-y-scope/spider#540, y-scope/spider#557.
+**Sources.**
+
+- [y-scope/clp#2045](https://github.com/y-scope/clp/pull/2045): a plain read takes a snapshot, not a lock; adds `LOCK IN SHARE MODE`
+- [y-scope/clp#2038](https://github.com/y-scope/clp/pull/2038#discussion_r2856964175): reviewer assumes the unlocked status read already holds an `S` lock
+- [y-scope/spider#283](https://github.com/y-scope/spider/pull/283#discussion_r2921926472): pass expected and target states for one conditional update, avoiding lock-promotion deadlocks
+- [y-scope/spider#292](https://github.com/y-scope/spider/pull/292#discussion_r3041909365): reviewer objects to splitting a method into non-atomic transactions
+- [y-scope/spider#314](https://github.com/y-scope/spider/pull/314#discussion_r3149589314): reviewer: name it `death_confirmed_at`, without `ON UPDATE CURRENT_TIMESTAMP`
+- [y-scope/spider#450](https://github.com/y-scope/spider/pull/450): replaces MariaDB-only `RETURNING id` with `last_insert_id()` for MySQL
+- [y-scope/spider#493](https://github.com/y-scope/spider/pull/493#discussion_r4090973454): select-then-insert races, and deadlocks on gap locks
+- [y-scope/spider#520](https://github.com/y-scope/spider/issues/520): an in-memory-only session check lets a superseded process keep committing
+- [y-scope/spider#532](https://github.com/y-scope/spider/pull/532): fences every database write with the storage session
+- [y-scope/spider#540](https://github.com/y-scope/spider/pull/540): multi-job updates in one fenced, state-guarded statement or transaction
+- [y-scope/spider#557](https://github.com/y-scope/spider/pull/557): commits up to 256 planned events in one fenced transaction
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r4077243068): the precondition must be checked even when marking a job failed
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#pullrequestreview-5286744460): `from: None` overwrote terminal statuses; a locked read reports which failure applied
+- [y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617): `request_cancellation` reads and updates the status in one transaction
+- [y-scope/spider#373](https://github.com/y-scope/spider/pull/373#discussion_r3539743682): a confirmation `SELECT` is meaningless; check the affected-row count instead
+- [spider `spider-storage/src/db/mariadb/tree_transition.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/mariadb/tree_transition.rs#L366-L378): `UpdateStatement::ensure_every_row_matched` turns a guarded-update mismatch into `CorruptedDbState`
 
 ## BND-4: Convert wire messages to domain types in one fallible layer
 
@@ -5207,7 +5643,8 @@ bad request look valid, and `as` wraps or truncates silently: a client's `task_i
 `serialized_outputs.unwrap_or_default()` means storage cannot tell `None` from `Some(vec![])`, so it
 cannot enforce the trait's documented rule that commit and cleanup tasks report no outputs. A tuple
 such as `(SessionId, JobId, TaskId, TaskInstanceId, Vec<u8>)` lets two handlers destructure the
-fields in different orders without a compiler error; y-scope/spider#471 turned such a tuple into
+fields in different orders without a compiler error;
+[y-scope/spider#471](https://github.com/y-scope/spider/pull/471) turned such a tuple into
 `NextTaskRequestPayload` for that reason.
 
 ```rust,ignore
@@ -5247,7 +5684,8 @@ impl TryFrom<proto::ExecutionContext> for ExecutionContext {
   opaque `bytes` fields carrying what should be a typed message. Each hand-written conversion gets
   one rejection test per error variant.
 - Keep unpacking a pure translation. Don't reject a field there because one backend doesn't support
-  it yet; that backend returns a typed `Unsupported` error itself (y-scope/spider#471).
+  it yet; that backend returns a typed `Unsupported` error itself
+  ([y-scope/spider#471](https://github.com/y-scope/spider/pull/471)).
 
 **Exceptions.** A domain-to-wire conversion that cannot fail on any supported target may use
 `expect("...")` stating why.
@@ -5255,13 +5693,17 @@ impl TryFrom<proto::ExecutionContext> for ExecutionContext {
 See also: coding-style.md § API design (named fields over positional tuples), coding-style.md § What
 deserves a unit test.
 
-**Sources.** spider components/spider-proto-rust/src/unpack/mod.rs, spider
-components/spider-proto-rust/src/unpack/storage.rs, spider
-components/spider-proto-rust/src/unpack/scheduler.rs, spider
-components/spider-proto-rust/src/job.rs, spider
-components/spider-execution-manager/src/client/storage.rs, spider
-components/spider-execution-manager/src/client/grpc/storage.rs, y-scope/spider#353,
-y-scope/spider#354, y-scope/spider#471.
+**Sources.**
+
+- [spider `spider-proto-rust/src/unpack/mod.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/unpack/mod.rs#L31-L48): `RequestUnpack`, the one fallible proto-to-native conversion layer
+- [spider `spider-proto-rust/src/unpack/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/unpack/storage.rs#L84-L113): `ReportTaskSuccessRequest` still unpacks into a five-value tuple
+- [spider `spider-proto-rust/src/unpack/scheduler.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/unpack/scheduler.rs#L16-L44): `NextTaskRequestPayload`, a named-field struct instead of a tuple
+- [spider `spider-proto-rust/src/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/job.rs#L23-L39): `TryFrom` maps `JobState::Unspecified` to a named error
+- [spider `spider-execution-manager/src/client/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/storage.rs#L78-L109): `report_task_success` requires `None` outputs for commit and cleanup tasks
+- [spider `spider-execution-manager/src/client/grpc/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/grpc/storage.rs#L91-L114): `serialized_outputs.unwrap_or_default()` erases `None` versus empty
+- [y-scope/spider#353](https://github.com/y-scope/spider/pull/353): introduces `RequestUnpack` to convert proto requests into native types
+- [y-scope/spider#354](https://github.com/y-scope/spider/pull/354): typed `ExecutionContext` via `TryFrom`, failing on missing nested messages
+- [y-scope/spider#471](https://github.com/y-scope/spider/pull/471): unpacking yields `NextTaskRequestPayload`; the core, not the protocol, refuses groups
 
 ## BND-5: Load config and env vars at startup, and tell absent apart from invalid
 
@@ -5278,7 +5720,8 @@ warning and an execution manager that is not dedicated to any resource group, so
 all of them: a silent isolation failure. `map_err(|_| MissingEnvVar(..))` also reports a non-Unicode
 value as "not set". A lazily initialized global that `expect`s moves a startup failure to whichever
 request first touches it. Defining your own env-var names for a dependency's credentials gives two
-schemas that drift apart (y-scope/clp#2532).
+schemas that drift apart
+([y-scope/clp#2532](https://github.com/y-scope/clp/pull/2532#discussion_r4106135253)).
 
 ```rust,ignore
 // Bad
@@ -5311,15 +5754,27 @@ fn read_env(key: &'static str) -> Result<Option<String>, CredentialsError> {
   the field instead, as spider's `DatabaseCredentials` does.
 - Flag `OnceLock`/`LazyLock` getters that read files or env vars, and service binaries that rebuild
   their config from many CLI flags: the CLI takes only a config path, and the serde config holds
-  every sub-config (y-scope/spider#346).
+  every sub-config
+  ([y-scope/spider#346](https://github.com/y-scope/spider/pull/346#pullrequestreview-4546792735)).
 - If an env key is optional by default but the operator listed it explicitly, log a warning when it
-  is missing (y-scope/spider#389).
+  is missing
+  ([y-scope/spider#389](https://github.com/y-scope/spider/pull/389#discussion_r3573945411)).
 
-**Sources.** spider components/spider-execution-manager/src/config.rs, spider
-components/spider-core/src/types/resource_group.rs, spider components/spider-storage/src/config.rs,
-spider components/spider-execution-manager/src/client/scheduler.rs, y-scope/spider#341,
-y-scope/spider#346, y-scope/spider#379, y-scope/spider#389, y-scope/spider#397, y-scope/clp#2532,
-y-scope/clp#2549. See also: TEST-5 (testing env-dependent code without mutating the environment).
+See also: TEST-5 (testing env-dependent code without mutating the environment).
+
+**Sources.**
+
+- [spider `spider-execution-manager/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/config.rs#L38-L73): `runtime_config` turns any credential error into a warning and `None`
+- [spider `spider-core/src/types/resource_group.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/resource_group.rs#L36-L60): `from_env` reports every `VarError` as `MissingEnvVar`
+- [spider `spider-storage/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/config.rs#L82-L140): `DatabaseCredentials` resolves config, else env, via `try_from = "Option<RawCredentials>"`
+- [spider `spider-execution-manager/src/client/scheduler.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/scheduler.rs#L31-L64): `next_task` without a resource group takes tasks from any group
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341#pullrequestreview-4493746031): reviewer: `create_runtime` takes the GC config, grouped into `RuntimeConfig`
+- [y-scope/spider#346](https://github.com/y-scope/spider/pull/346#pullrequestreview-4546792735): reviewer: a serde `RuntimeConfig` instead of rebuilding config from CLI flags
+- [y-scope/spider#379](https://github.com/y-scope/spider/pull/379): test driver's lazy singleton reads `SPIDER_CONCURRENCY`, defaulting to 8
+- [y-scope/spider#389](https://github.com/y-scope/spider/pull/389#discussion_r3573945411): warn when an explicitly listed env key is unset
+- [y-scope/spider#397](https://github.com/y-scope/spider/pull/397#pullrequestreview-4698875645): serde resolves optional config credentials, else env vars
+- [y-scope/clp#2532](https://github.com/y-scope/clp/pull/2532#discussion_r4106135253): use Spider's own credential env-var names, as with AWS
+- [y-scope/clp#2549](https://github.com/y-scope/clp/pull/2549#discussion_r4170140547): load credentials with `from_env()?` and propagate the error
 
 ## BND-6: Make every default an intended value, owned in one place
 
@@ -5332,8 +5787,11 @@ and pass `None` through instead of copying its literal.
 **Why.** `#[serde(default)] max_connections: usize` yields 0 when the key is missing: a pool that
 hands out no connections, with no error. Without a struct-level default, `{"buffer_config":
 {"timeout_sec": 100}}` is rejected with "missing field", because a nested object that is present
-must list every field (y-scope/clp#2150). A copied default drifts: Celery and clp-s each hard-coded
-a result limit of 1000, so changing one silently made them disagree (y-scope/clp#2503).
+must list every field
+([y-scope/clp#2150](https://github.com/y-scope/clp/pull/2150#discussion_r3015802782)). A copied
+default drifts: Celery and clp-s each hard-coded a result limit of 1000, so changing one silently
+made them disagree
+([y-scope/clp#2503](https://github.com/y-scope/clp/pull/2503#discussion_r3900175343)).
 
 ```rust,ignore
 // Bad
@@ -5373,14 +5831,21 @@ if let Some(max_num_results) = config.max_num_results {
 - Flag a nested config whose fields all have defaults but which has no struct-level
   `#[serde(default)]`.
 - When a type mirrors an external schema, make a field `Option` only if the source allows it to be
-  absent or null; a required collection is an empty `Vec`, not `None` (y-scope/clp#2087).
+  absent or null; a required collection is an empty `Vec`, not `None`
+  ([y-scope/clp#2087](https://github.com/y-scope/clp/pull/2087#discussion_r2965812887)).
 
 See also: coding-style.md § Mirroring Python Types (defaults kept in sync), MOD-2 (a changed default
 is a breaking change).
 
-**Sources.** y-scope/clp#2150, y-scope/clp#2503, y-scope/clp#2087, y-scope/clp#1729, spider
-components/spider-execution-manager/src/config.rs, spider components/spider-storage/src/config.rs,
-RustTraining rust-patterns-book/src/ch11-serialization-zero-copy-and-binary-data.md.
+**Sources.**
+
+- [y-scope/clp#2150](https://github.com/y-scope/clp/pull/2150#discussion_r3015802782): reviewer: a partial `buffer_config` is rejected without struct-level default
+- [y-scope/clp#2503](https://github.com/y-scope/clp/pull/2503#discussion_r3900175343): reviewer: let clp-s own the result-limit default instead of copying 1000
+- [y-scope/clp#2087](https://github.com/y-scope/clp/pull/2087#discussion_r2965812887): reviewer: the Python field isn't nullable, so don't make it optional
+- [y-scope/clp#1729](https://github.com/y-scope/clp/pull/1729#discussion_r2594209669): reviewer asks for struct-level `#[serde(default)]` on `ArchiveOutput`
+- [spider `spider-execution-manager/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/config.rs#L88-L122): `max_log_line_bytes` defaults through a fn returning `NonZeroUsize`
+- [spider `spider-storage/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/config.rs#L69-L80): defaulted `pool` section with struct-level `#[serde(default)]` and `Default`
+- [RustTraining rust-patterns-book § Common serde Attributes](https://microsoft.github.io/RustTraining/rust-patterns-book/ch11-serialization-zero-copy-and-binary-data.html#common-serde-attributes): `default`, `default = "fn"` and `deny_unknown_fields`
 
 ## BND-7: Bound and tolerate untrusted byte streams
 
@@ -5395,9 +5860,11 @@ flipped bit, make the process allocate 4 GiB. On the write side, `len() as u32` 
 falls out of sync with its length prefix. One runaway line from a child process grows memory without
 bound, and a reader that stops at the first oversize error loses all output after it. `FramedRead`
 yields one `None` right after a decode error and then resumes, so that `None` must not be treated as
-end of stream (tokio-rs/tokio#3976, y-scope/spider#418). Real log data contains invalid UTF-8:
-strict decoding turned one bad line into a failed query, and `String::from_utf8_lossy` alone was
-2-4x slower on valid ASCII than trying `str::from_utf8` first (y-scope/clp#2649).
+end of stream ([tokio-rs/tokio#3976](https://github.com/tokio-rs/tokio/issues/3976),
+[y-scope/spider#418](https://github.com/y-scope/spider/pull/418)). Real log data contains invalid
+UTF-8: strict decoding turned one bad line into a failed query, and `String::from_utf8_lossy` alone
+was 2-4x slower on valid ASCII than trying `str::from_utf8` first
+([y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4449178317)).
 
 ```rust,ignore
 // Bad
@@ -5429,24 +5896,36 @@ let message: Cow<'_, str> =
 - Spawn child processes with `Command::new(bin).args(..)`, never `sh -c` with an interpolated
   string; set `kill_on_drop(true)`, and attach or log the captured stderr when the process fails.
 
-**Sources.** y-scope/spider#418, spider components/spider-execution-manager/src/process_pool.rs,
-y-scope/clp#2649, clp components/clp-rust-libs/query-result-listener/src/protocol.rs, clp
-components/clp-tdl-package/src/task/query/search.rs, tokio-rs/tokio#3976. See also: DEF-5 (caps on
-what a peer can size) and DEF-9 (checked slicing of decoded buffers).
+See also: SRV-3 (caps on what a peer can size) and DEF-4 (checked slicing of decoded buffers).
+
+**Sources.**
+
+- [y-scope/spider#418](https://github.com/y-scope/spider/pull/418): capped `LinesCodec`, oversized lines dropped, `FramedRead`'s post-error `None` handled
+- [spider `spider-execution-manager/src/process_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/process_pool.rs#L436-L489): `forward_executor_logs` drops an oversized line with a `warn` and resumes
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4438307065): reviewer: non-UTF-8 clp-s output fails strict decoding; decode lossily
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4449178317): reviewer: try `str::from_utf8` first; lossy alone is 2-4x slower
+- [clp `clp-rust-libs/query-result-listener/src/protocol.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/protocol.rs#L284-L318): `read_str` caps the length, borrows valid UTF-8, else decodes lossily
+- [clp `clp-tdl-package/src/task/query/search.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-tdl-package/src/task/query/search.rs#L534-L601): `run_clp_s_search` uses `Command::new(..).args(..)` and logs stderr on failure
+- [tokio-rs/tokio#3976](https://github.com/tokio-rs/tokio/issues/3976): `Framed` keeps reading after a decode error instead of terminating
 
 ## BND-8: Keep secrets typed, unserialized, out of logs, and compared in constant time
 
 **Rule.** Hold passwords and tokens as `secrecy::SecretString` or `SecretSlice<u8>`, and call
 `expose_secret()` only where the value is used. Mark credential fields `#[serde(skip_serializing)]`
 on any type that derives `Serialize`. Compare a supplied credential with the stored one using
-`subtle::ConstantTimeEq`. Don't log an access-granting value (a session token, a presigned URL) on
-the success path.
+`subtle::ConstantTimeEq`. Keep the wrapper on every internal API that carries the secret, down to
+the call that sends or compares it. Don't log an access-granting value (a session token, a presigned
+URL) on the success path.
 
 **Why.** A plain `String` password leaks through `#[derive(Debug)]` into logs and panic messages,
 and through re-serializing the config; `SecretString`'s `Debug` prints `[REDACTED]`. `==` on byte
 strings may stop at the first differing byte, which leaks timing information. A valid session token
 logged on every accepted connection lets anyone who can read the logs join that session
-(y-scope/clp#2689). A rejected, unknown token grants nothing, so it may be logged.
+([y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689)). A rejected, unknown token grants
+nothing, so it may be logged. A wrapper protects only as far as it reaches: Spider's
+`ExternalResourceGroupCredentials` keeps its password in a `SecretSlice`, so `Debug` redacts it, but
+`Client::verify_resource_group` takes the password as a bare `Vec<u8>`. From that call on, a single
+`?password` in a log line prints it.
 
 ```rust,ignore
 // Bad
@@ -5483,16 +5962,31 @@ if !bool::from(stored_password.ct_eq(credentials.password.expose_secret().as_byt
 **Review.**
 - Flag `String` or `Vec<u8>` fields named `password`, `secret`, or `token` on types that derive
   `Debug` or `Serialize`, and `==` on credentials.
+- Flag a secret that crosses a function boundary as a `Vec<u8>` or `String`, even between internal
+  layers.
 - Flag `tracing` fields that carry tokens or credentials on accept or success paths; log the peer
   address or task index instead.
 - Flag `expose_secret()` results stored in a variable or struct that outlives the call that needs
   the value.
 
-**Sources.** spider components/spider-storage/src/config.rs, spider
-components/spider-storage/src/db/mariadb/resource_group.rs, spider
-components/spider-core/src/types/resource_group.rs, y-scope/spider#397, y-scope/spider#469,
-y-scope/spider#493, y-scope/clp#2689. See also: TYPE-10 (keeping the secret wrapper across internal
-APIs).
+**Exceptions.** A wrapper has to prevent a real misuse.
+[y-scope/clp#1704](https://github.com/y-scope/clp/pull/1704#discussion_r2590945683) dropped
+`SecretString` from the AWS secret-key path, where the keys already arrive through environment
+variables and the wrapper only added conversions. When a reviewer asks what a wrapper prevents, the
+answer must be concrete.
+
+**Sources.**
+
+- [spider `spider-storage/src/config.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/config.rs#L32-L88): `credentials` is `skip_serializing`, its password a `SecretString`
+- [spider `spider-storage/src/db/mariadb/resource_group.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/mariadb/resource_group.rs#L100-L123): `verify` compares the stored password with `ct_eq`
+- [spider `spider-core/src/types/resource_group.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/resource_group.rs#L12-L20): the resource group password held as `SecretSlice<u8>`
+- [y-scope/spider#397](https://github.com/y-scope/spider/pull/397): database credentials from env vars instead of plaintext config
+- [y-scope/spider#469](https://github.com/y-scope/spider/pull/469#issuecomment-5527563360): maintainer agrees to make the password a `secrecy` secret
+- [y-scope/spider#493](https://github.com/y-scope/spider/pull/493#discussion_r4100744256): reviewer's rewrite checks the stored password with `ct_eq`
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689): listener logs omit valid session tokens; only unknown tokens are named
+- [spider `spider-client/src/client.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/client.rs#L217-L240): `verify_resource_group` takes the password as a bare `Vec<u8>`
+- [y-scope/spider#292](https://github.com/y-scope/spider/pull/292#discussion_r3041915941): the password check uses `subtle::ConstantTimeEq`
+- [y-scope/clp#1704](https://github.com/y-scope/clp/pull/1704#discussion_r2590945683): reviewer: `SecretString` only adds hassle on the AWS key path
 
 ## BND-9: Treat wire status codes as a contract, and keep client-facing errors coarse
 
@@ -5505,10 +5999,11 @@ failures with a fixed `INTERNAL` message while logging the detail on the server.
 
 **Why.** Storage used to return `UNAVAILABLE` for a stale session and for a fatal cache error, so
 the execution manager couldn't tell "reconnect" from "your request is wrong". When
-y-scope/spider#358 moved stale sessions to `NOT_FOUND`, the client's catch-all `_ => Server(..)` arm
-would have silently absorbed the new code and broken stale-session recovery had the decoder not
-changed in the same PR. Separate not-found and bad-password replies let a caller enumerate resource
-groups, and internal error strings expose SQL, schema, or cache state.
+[y-scope/spider#358](https://github.com/y-scope/spider/pull/358) moved stale sessions to
+`NOT_FOUND`, the client's catch-all `_ => Server(..)` arm would have silently absorbed the new code
+and broken stale-session recovery had the decoder not changed in the same PR. Separate not-found and
+bad-password replies let a caller enumerate resource groups, and internal error strings expose SQL,
+schema, or cache state.
 
 ```rust,ignore
 // Bad
@@ -5548,7 +6043,7 @@ fn status_to_error(status: &Status) -> StorageResponseError {
 
 The server side names every remaining variant instead of ending in a catch-all (ERR-6). The client
 decoder may end in `_`, because `tonic::Code` is a foreign enum, as long as the fallback is the
-conservative `Server` error (DEF-1).
+conservative `Server` error.
 
 **Review.**
 - Flag RPC methods that inspect `status.code()` themselves, and any server-side change to a status
@@ -5558,12 +6053,20 @@ conservative `Server` error (DEF-1).
   `Status::internal(e.to_string())` or `{e:?}` sent to clients.
 - Flag error responses or client-visible messages that reveal whether a protected resource exists.
 
-**Sources.** y-scope/spider#353, y-scope/spider#354, y-scope/spider#358, y-scope/spider#359,
-y-scope/spider#364, y-scope/spider#369, y-scope/spider#464, spider
-components/spider-storage/src/grpc.rs, spider
-components/spider-execution-manager/src/client/grpc/storage.rs, spider
-components/spider-execution-manager/src/client/grpc/liveness.rs. See also: ERR-6 (translating errors
-in one exhaustive place).
+See also: ERR-6 (translating errors in one exhaustive place).
+
+**Sources.**
+
+- [y-scope/spider#353](https://github.com/y-scope/spider/pull/353): `UNAUTHENTICATED` for unknown group or bad password; opaque `INTERNAL` otherwise
+- [y-scope/spider#354](https://github.com/y-scope/spider/pull/354): adds the client's `status_to_error`; stale sessions were still `UNAVAILABLE`
+- [y-scope/spider#358](https://github.com/y-scope/spider/pull/358): reserves `UNAVAILABLE` for transport errors and updates the client decoder
+- [y-scope/spider#359](https://github.com/y-scope/spider/pull/359#discussion_r3488354927): reviewer: the client handler ignores `UNAVAILABLE`'s reserved meaning
+- [y-scope/spider#364](https://github.com/y-scope/spider/pull/364#discussion_r3525523065): reviewer: per-service handlers, everything else through one default handler
+- [y-scope/spider#369](https://github.com/y-scope/spider/pull/369#discussion_r3525908337): reviewer: the client-side status handling belongs in the same PR
+- [y-scope/spider#464](https://github.com/y-scope/spider/pull/464): one `UNAUTHENTICATED` for a wrong resource group ID or password
+- [spider `spider-storage/src/grpc.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/grpc.rs#L162-L230): task-instance error handler: `NOT_FOUND` for stale sessions, rest to the default
+- [spider `spider-execution-manager/src/client/grpc/storage.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/grpc/storage.rs#L142-L161): `status_to_error` decodes each code, falling back to `Server`
+- [spider `spider-execution-manager/src/client/grpc/liveness.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-execution-manager/src/client/grpc/liveness.rs#L96-L113): liveness `status_to_error`; its fallback is `Transport`, not `Server`
 
 ## BND-10: Read DB rows through typed projections and re-validate them as persisted data
 
@@ -5577,11 +6080,13 @@ conversions and formatting in Rust, not in SQL.
 reorders the `SELECT`. Persisted data can be corrupted or written by an older version, so skipping
 validation on the read path lets broken invariants into the cache. The right error category depends
 on where the data came from, and only the call site knows that: a blanket `From<JobSubmissionError>
-for ServerError::BadRequest` would report a corrupted row as a client mistake, so y-scope/spider#351
-maps it to `CorruptedDbState` on recovery and to `BadRequest` on submission. Formatting in SQL
-(`DATE_FORMAT`, `ROUND`, `FROM_UNIXTIME(? / 1000.0)`) splits the type contract across two languages
-and makes clients re-parse values, and in y-scope/clp#2197 a vendor-specific aggregate (`ANY_VALUE`)
-failed on MariaDB.
+for ServerError::BadRequest` would report a corrupted row as a client mistake, so
+[y-scope/spider#351](https://github.com/y-scope/spider/pull/351#discussion_r3470399072) maps it to
+`CorruptedDbState` on recovery and to `BadRequest` on submission. Formatting in SQL (`DATE_FORMAT`,
+`ROUND`, `FROM_UNIXTIME(? / 1000.0)`) splits the type contract across two languages and makes
+clients re-parse values, and in
+[y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3069536389) a
+vendor-specific aggregate (`ANY_VALUE`) failed on MariaDB.
 
 ```rust,ignore
 // Bad
@@ -5623,10 +6128,20 @@ Here `DbError::corrupted` wraps any error's message in `DbError::CorruptedDbStat
 See also: coding-style.md § SQL and Database Patterns, coding-style.md § Avoid hardcoded state
 values, TYPE-5 (one row type per query shape).
 
-**Sources.** y-scope/spider#339, y-scope/spider#351, y-scope/spider#353, y-scope/spider#285, spider
-components/spider-storage/src/db/mariadb/job.rs, spider
-components/spider-storage/src/db/mariadb/scheduler.rs, y-scope/clp#2197, y-scope/clp#2420,
-y-scope/clp#2513, y-scope/clp#2058.
+**Sources.**
+
+- [y-scope/spider#339](https://github.com/y-scope/spider/pull/339#pullrequestreview-4471850284): reviewer adds `RecoverableJobRowProjection` to make the query readable
+- [y-scope/spider#351](https://github.com/y-scope/spider/pull/351#discussion_r3470399072): reviewer: map `JobSubmissionError` to `CorruptedDbState` on recovery
+- [y-scope/spider#351](https://github.com/y-scope/spider/pull/351#discussion_r3470408829): reviewer: forward the same error as `BadRequest` on submission
+- [y-scope/spider#353](https://github.com/y-scope/spider/pull/353): a database-minted duplicate job ID is internal, not a client-facing error
+- [y-scope/spider#285](https://github.com/y-scope/spider/pull/285#discussion_r2972593594): reviewer: no hard-coded `'Ready'`; derive the state enum's SQL mapping
+- [spider `spider-storage/src/db/mariadb/job.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/mariadb/job.rs#L296-L342): `RecoverableJobRowProjection` re-runs `ValidatedJobSubmission::create` as `CorruptedDbState`
+- [spider `spider-storage/src/db/mariadb/scheduler.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/db/mariadb/scheduler.rs#L60-L90): `SchedulerRowProjection` re-validates the stored host as a `Host`
+- [y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3068016843): reviewer: derive `sqlx::FromRow` instead of mapping with `try_get`
+- [y-scope/clp#2197](https://github.com/y-scope/clp/pull/2197#discussion_r3069560459): reviewer: drop SQL `ROUND` and `FROM_UNIXTIME`; bind typed values
+- [y-scope/clp#2420](https://github.com/y-scope/clp/pull/2420#discussion_r3654294879): reviewer: add a struct for the row projection
+- [y-scope/clp#2513](https://github.com/y-scope/clp/pull/2513#discussion_r3963842747): reviewer: bind job status through `sqlx::Type`, not an enum-to-int cast
+- [y-scope/clp#2058](https://github.com/y-scope/clp/pull/2058#discussion_r2877153900): reviewer: `i8` for a `TINYINT` column, as a named constant
 
 # Modules, crates and API surface
 
@@ -5684,9 +6199,14 @@ impl Bucket {
   types into one module, or to add a narrow method.
 - Flag internal DTOs, parsing helpers, encodings and test structs that are `pub`.
 
-**Sources.** y-scope/clp#2578, y-scope/clp#2690, y-scope/clp#2564, RustTraining
-c-cpp-book/src/ch18-cpp-rust-semantic-deep-dives.md. See also: OBJ-1 (private fields protect
-invariants).
+See also: OBJ-1 (private fields protect invariants).
+
+**Sources.**
+
+- [y-scope/clp#2578](https://github.com/y-scope/clp/pull/2578#discussion_r4503774877): reviewer narrows `Bucket::try_from_aggregation_document` to `pub(super)`
+- [y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690#discussion_r4530585669): `SseEncoding` should be crate-public, since `api-server` isn't delivered as a library
+- [y-scope/clp#2564](https://github.com/y-scope/clp/pull/2564#discussion_r4253602162): reviewer flags a `pub` struct that is only for internal use
+- [RustTraining c-cpp-book § `friend` and Access Control → Module Visibility](https://microsoft.github.io/RustTraining/c-cpp-book/ch18-cpp-rust-semantic-deep-dives.html#friend-and-access-control--module-visibility): same-module access replaces `friend`
 
 ## MOD-2: Treat every contract change as breaking, and make the breakage loud rather than tolerated
 
@@ -5697,13 +6217,15 @@ or removed key, a renamed variant or a changed default. Before merging, list eve
 consumer of the format, including non-Rust ones, and either update them or file tracked issues.
 Readers of a format that has changed reject the old shape. They don't quietly accept it.
 
-**Why.** The Rust compiler can't see a Python or WebUI producer. In y-scope/clp#2652, the typed
+**Why.** The Rust compiler can't see a Python or WebUI producer. In
+[y-scope/clp#2652](https://github.com/y-scope/clp/pull/2652#pullrequestreview-5729998540), the typed
 `QueryJobConfig` with `deny_unknown_fields` broke the MCP server, which still wrote the old flat
 config, so its searches would fail on new deployments. The failure was loud, so it was found in
-review and tracked (y-scope/clp#2656). A tolerant reader would have run an empty query in silence.
-Users who never set a field still depend on its default. Raising a buffer threshold 16x can run
-memory-constrained systems out of memory with no change to their config. A `pub` item that no other
-repository consumes is not a contract, so changing it doesn't need `!`.
+review and tracked ([y-scope/clp#2656](https://github.com/y-scope/clp/issues/2656)). A tolerant
+reader would have run an empty query in silence. Users who never set a field still depend on its
+default. Raising a buffer threshold 16x can run memory-constrained systems out of memory with no
+change to their config. A `pub` item that no other repository consumes is not a contract, so
+changing it doesn't need `!`.
 
 ```rust,ignore
 // Bad: every field optional, unknown fields ignored
@@ -5737,18 +6259,29 @@ pub struct QueryJobConfig {
   chart whose version didn't change, while CI still reports success.
 - Flag `#[non_exhaustive]` on enums that only our own crates consume. It makes adding a variant
   non-breaking by switching off exhaustiveness checking in every other crate, which removes the
-  compile error that would have forced each consumer to handle the new state (DEF-1).
+  compile error that would have forced each consumer to handle the new state.
 
 **Exceptions.** The RustTraining books recommend `#[non_exhaustive]` for public enums. That advice
 fits a crate published for third parties that mirrors a vocabulary outside our control and expected
 to grow, such as an external API's status codes.
 
-**Sources.** y-scope/clp#2652, y-scope/clp#2656, y-scope/clp#2564, y-scope/clp#2620,
-y-scope/clp#1965, y-scope/clp#1962, y-scope/spider#464, y-scope/spider#418, y-scope/spider#409,
-RustTraining type-driven-correctness-book/src/ch11-fourteen-tricks-from-the-trenches.md,
-RustTraining rust-patterns-book/src/ch15-crate-architecture-and-api-design.md. See also:
-pr-review.md § PR Title Convention, Common Review Checks #10, BND-2 (strict schemas) and BND-6
-(defaults).
+See also: pr-review.md § PR Title Convention, Common Review Checks #10, BND-2 (strict schemas) and
+BND-6 (defaults).
+
+**Sources.**
+
+- [y-scope/clp#2652](https://github.com/y-scope/clp/pull/2652#pullrequestreview-5729998540): reviewer finds the MCP server still writes the old flat config
+- [y-scope/clp#2656](https://github.com/y-scope/clp/issues/2656): tracks MCP server searches failing on the new `QueryJobConfig`
+- [y-scope/clp#2564](https://github.com/y-scope/clp/pull/2564#discussion_r4253602162): `ArchiveMetadata` is internal, so replacing its field isn't breaking
+- [y-scope/clp#2620](https://github.com/y-scope/clp/pull/2620#discussion_r4403220812): reviewer asks to mark a partitioning behaviour change as breaking
+- [y-scope/clp#1965](https://github.com/y-scope/clp/pull/1965#discussion_r2788682533): a 16x default threshold may crash memory-constrained deployments
+- [y-scope/clp#1965](https://github.com/y-scope/clp/pull/1965#pullrequestreview-3781975663): maintainers confirm the changed default is breaking and add `!`
+- [y-scope/clp#1962](https://github.com/y-scope/clp/pull/1962): renames the `ec2` auth variant to `default`, marked breaking
+- [y-scope/spider#464](https://github.com/y-scope/spider/pull/464#discussion_r3897792061): reviewer asks to mark the storage and protocol changes breaking
+- [y-scope/spider#418](https://github.com/y-scope/spider/pull/418): Helm chart version bump required, or publishing silently skips it
+- [y-scope/spider#409](https://github.com/y-scope/spider/pull/409): a new FFI entry point, marked breaking with a migration note
+- [RustTraining type-driven-correctness-book § `#[non_exhaustive]` for Evolving Enums](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch11-fourteen-tricks-from-the-trenches.html#trick-3--non_exhaustive-for-evolving-enums): the `#[non_exhaustive]` advice the Exceptions narrow
+- [RustTraining rust-patterns-book § Public API Design Checklist](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#public-api-design-checklist): recommends `#[non_exhaustive]` on public enums (see Exceptions)
 
 ## MOD-3: Declare each dependency once, pin cross-repo ones to a commit, and bump every reference together
 
@@ -5762,10 +6295,11 @@ isn't production-ready.
 **Why.** Versions pinned per crate drift apart. The clp workspace once had `tokio` at both 1.49.0
 and 1.52.3, which meant duplicate builds and a separate edit per crate for every bump. Tracking
 `main` lets an upstream merge break us with no change on our side. A partial bump fails silently. In
-y-scope/clp#2532, one Dockerfile kept an older Spider worker image that ignored the resource-group
-env vars, so dedicated workers registered as general and nothing reported an error. A dependency
-with an `unsafe` API hands its memory-safety obligations to our code. A deprecated but widely used
-crate is still safer than a maintained alternative with a thousandth of the users.
+[y-scope/clp#2532](https://github.com/y-scope/clp/pull/2532#issuecomment-5908243126), one Dockerfile
+kept an older Spider worker image that ignored the resource-group env vars, so dedicated workers
+registered as general and nothing reported an error. A dependency with an `unsafe` API hands its
+memory-safety obligations to our code. A deprecated but widely used crate is still safer than a
+maintained alternative with a thousandth of the users.
 
 ```toml
 # Bad: `components/foo/Cargo.toml`
@@ -5790,9 +6324,18 @@ tokio = { workspace = true, features = ["rt"] }
 - Flag a dependency that isn't the obvious mature crate when the PR description gives no reason for
   choosing it.
 
-**Sources.** y-scope/clp#2471, y-scope/clp#2532, y-scope/clp#2549, y-scope/clp#2375,
-y-scope/clp#2312, y-scope/spider#285, y-scope/spider#289. See also: coding-style.md § Dependencies
-(exact patch versions, sorted, no unused entries).
+See also: coding-style.md § Dependencies (exact patch versions, sorted, no unused entries).
+
+**Sources.**
+
+- [y-scope/clp#2471](https://github.com/y-scope/clp/pull/2471): moves every crate version into `[workspace.dependencies]`
+- [y-scope/clp#2532](https://github.com/y-scope/clp/pull/2532#pullrequestreview-5360553746): reviewer asks to pin Spider to a commit instead of `main`
+- [y-scope/clp#2532](https://github.com/y-scope/clp/pull/2532#issuecomment-5908243126): one Dockerfile's Spider worker image was left unpinned
+- [y-scope/clp#2549](https://github.com/y-scope/clp/pull/2549#discussion_r4170144866): the Spider bump changes the DB schema, so mark it breaking
+- [y-scope/clp#2375](https://github.com/y-scope/clp/pull/2375#discussion_r3814730160): prefer `zstd` over `libzstd-rs-sys`, which has `unsafe` APIs and isn't production-ready
+- [y-scope/clp#2312](https://github.com/y-scope/clp/pull/2312#issuecomment-4650233848): a deprecated but widely used crate beats a little-used alternative
+- [y-scope/spider#285](https://github.com/y-scope/spider/pull/285#discussion_r2970704684): reviewer asks to lock dependencies to exact patch versions
+- [y-scope/spider#289](https://github.com/y-scope/spider/pull/289): locks `serde` to 1.0.228
 
 ## MOD-4: Place code by dependency direction, and share it once a second consumer needs it
 
@@ -5808,7 +6351,8 @@ create a dependency cycle. A domain crate that depends on protobuf types forces 
 change on consumers that never speak gRPC, and it mixes domain invariants with wire details such as
 `Unspecified` or optional sub-messages. The conversions satisfy the orphan rule when they live in
 the protocol crate, because the generated types are local there, so no wrapper types are needed. A
-helper moved into a shared crate too early, like `scan_prefix` in y-scope/clp#2224, also loses the
+helper moved into a shared crate too early, like `scan_prefix` in
+[y-scope/clp#2224](https://github.com/y-scope/clp/pull/2224#discussion_r3144459192), also loses the
 test infrastructure (localstack) that its only consumer already had.
 
 ```toml
@@ -5835,11 +6379,20 @@ spider-proto-rust = { workspace = true }
 **Exceptions.** A planned PR series that adds the second consumer soon may move the code early. Say
 so in the PR description.
 
-**Sources.** y-scope/spider#333, y-scope/spider#340, y-scope/spider#347, y-scope/spider#355,
-y-scope/spider#362, y-scope/clp#2224, y-scope/clp#2655, spider
-components/spider-proto-rust/src/lib.rs, spider components/spider-utils/Cargo.toml. See also:
-coding-style.md § Reusable code belongs in `clp-rust-utils`. That section says where shared code
-goes, and this rule says when code counts as shared.
+See also: coding-style.md § Reusable code belongs in `clp-rust-utils`. That section says where
+shared code goes, and this rule says when code counts as shared.
+
+**Sources.**
+
+- [y-scope/spider#333](https://github.com/y-scope/spider/pull/333#pullrequestreview-4422940472): a component's client trait stays in its consumer crate, not the proto crate
+- [y-scope/spider#340](https://github.com/y-scope/spider/pull/340#pullrequestreview-4489303309): restructures the client as `storage_client/{mod.rs, grpc.rs}`
+- [y-scope/spider#347](https://github.com/y-scope/spider/pull/347#pullrequestreview-4519930341): moves `RegisteredScheduler` into `spider-core` rather than depending on `spider-storage`
+- [y-scope/spider#355](https://github.com/y-scope/spider/pull/355): `spider-utils` depends on no Spider crate; `spider-core` builds on it
+- [y-scope/spider#362](https://github.com/y-scope/spider/pull/362): config loader moves into `spider-utils` once a second service needs it
+- [y-scope/clp#2224](https://github.com/y-scope/clp/pull/2224#discussion_r3144459192): keep `scan_prefix` in `log-ingestor`, its only consumer, with localstack tests
+- [y-scope/clp#2655](https://github.com/y-scope/clp/pull/2655): a crate is shared if other crates depend on it and nothing deploys it
+- [spider `spider-proto-rust/src/lib.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/lib.rs#L3-L51): generated code plus wire/domain conversion modules only
+- [spider `spider-utils/Cargo.toml`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/Cargo.toml#L10-L21): `[dependencies]` lists no workspace crate
 
 ## MOD-5: Make `mod.rs` a table of contents: declarations and named re-exports only
 
@@ -5850,10 +6403,11 @@ part of the API. Never write `pub use child::*`.
 
 **Why.** A glob re-export publishes every `pub` item ever added to the child, so a new helper joins
 the crate's API without showing up in any diff. Public file-organising submodules let siblings and
-other crates reach into each other's internals. Before y-scope/clp#2713, `connection` and `cursor`
-sat beside `session` at the crate root, so `session` and `connection` depended on each other's
-internals through `pub(crate)` items. Named re-exports document the contract in one place, and they
-let the files behind the module be rearranged without touching any caller.
+other crates reach into each other's internals. Before
+[y-scope/clp#2713](https://github.com/y-scope/clp/pull/2713), `connection` and `cursor` sat beside
+`session` at the crate root, so `session` and `connection` depended on each other's internals
+through `pub(crate)` items. Named re-exports document the contract in one place, and they let the
+files behind the module be rearranged without touching any caller.
 
 ```rust,ignore
 // Bad
@@ -5884,9 +6438,15 @@ pub(crate) use registry::SessionRegistry;
 - Ask for the split to land as a move-only PR, separate from any behaviour change. Verify it with
   `git diff --color-moved` and an unchanged test list.
 
-**Sources.** y-scope/clp#2713, y-scope/spider#382, y-scope/spider#542, y-scope/spider#555, clp
-components/clp-rust-libs/query-result-listener/src/session/mod.rs. See also: coding-style.md §
-Module Organization.
+See also: coding-style.md § Module Organization.
+
+**Sources.**
+
+- [y-scope/clp#2713](https://github.com/y-scope/clp/pull/2713): turns `session` into a module that owns `connection` and `cursor`
+- [y-scope/spider#382](https://github.com/y-scope/spider/pull/382): converts multi-file modules to the `mod.rs` layout
+- [y-scope/spider#542](https://github.com/y-scope/spider/pull/542): move-only split of `db/mariadb.rs`, checked with `git diff --color-moved`
+- [y-scope/spider#555](https://github.com/y-scope/spider/pull/555): `mod.rs` holds only submodule declarations and named re-exports
+- [clp `clp-rust-libs/query-result-listener/src/session/mod.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/mod.rs#L3-L19): private submodules with named `pub` and `pub(crate)` re-exports
 
 ## MOD-6: Give each shared type one owning crate and one import path
 
@@ -5898,9 +6458,11 @@ module that owns the concept is fine.
 
 **Why.** If a type can be imported from several paths, consumers drift onto whichever path they
 found first. Moving the type then breaks all of them, and it is no longer clear which crate owns its
-invariants. In y-scope/spider#469, the review removed `spider-storage`'s re-export of
-`ExternalResourceGroupCredentials` once the type lived in `spider-core`. Otherwise callers would
-have kept depending on the storage crate just to name a credentials type.
+invariants. In
+[y-scope/spider#469](https://github.com/y-scope/spider/pull/469#discussion_r3985370201), the review
+removed `spider-storage`'s re-export of `ExternalResourceGroupCredentials` once the type lived in
+`spider-core`. Otherwise callers would have kept depending on the storage crate just to name a
+credentials type.
 
 ```rust,ignore
 // Bad: `spider-storage/src/db/mod.rs`
@@ -5918,9 +6480,14 @@ use spider_core::types::resource_group::ExternalResourceGroupCredentials;
 - When a type moves, check that the old path is deleted rather than kept as a forwarding re-export.
   If another repository imported the old path, the PR is breaking (MOD-2).
 
-**Sources.** y-scope/spider#469, y-scope/clp#2087, clp
-components/query-coordinator/src/coordination.rs. See also: coding-style.md § Type Aliases for
-External Types, which applies the same one-owner principle to third-party types.
+See also: coding-style.md § Type Aliases for External Types, which applies the same one-owner
+principle to third-party types.
+
+**Sources.**
+
+- [y-scope/spider#469](https://github.com/y-scope/spider/pull/469#discussion_r3985370201): reviewer removes `spider-storage`'s re-export of the moved credentials type
+- [y-scope/clp#2087](https://github.com/y-scope/clp/pull/2087#discussion_r2965730998): move `JobId` to its owning module and re-export it as `IngestionJobId`
+- [clp `query-coordinator/src/coordination.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/query-coordinator/src/coordination.rs#L37-L39): imports `JobId as SpiderJobId` and credentials from `spider_core`
 
 ## MOD-7: Give user-facing crates a small facade, and keep transport and generated types private
 
@@ -5961,9 +6528,14 @@ pub use spider_utils::grpc::retry::RetryConfig;
 - Flag public items, docs or signatures that expose connection pools, channels, or generated gRPC
   clients and messages.
 
-**Sources.** y-scope/spider#363, y-scope/spider#382, y-scope/spider#396, spider
-components/spider-client/src/lib.rs (adapted to MOD-5), spider
-components/spider-proto-rust/src/lib.rs
+**Sources.**
+
+- [y-scope/spider#363](https://github.com/y-scope/spider/pull/363#discussion_r3492747900): users shouldn't need to know the underlying client types
+- [y-scope/spider#363](https://github.com/y-scope/spider/pull/363#discussion_r3492717206): group the gRPC clients in a crate-private `grpc` module
+- [y-scope/spider#382](https://github.com/y-scope/spider/pull/382): hides deep tonic-generated paths behind tidy re-exports
+- [y-scope/spider#396](https://github.com/y-scope/spider/pull/396): re-exports `SpiderClientBuilder` and `RetryConfig` from the crate root
+- [spider `spider-client/src/lib.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-client/src/lib.rs#L10-L16): the crate-root facade (the Good example adapts it to MOD-5)
+- [spider `spider-proto-rust/src/lib.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/lib.rs#L26-L51): flat re-exports of deep generated client and server paths
 
 ## MOD-8: Keep test-only code out of the production surface and dependency graph
 
@@ -6003,11 +6575,17 @@ pub fn random() -> Self {
   The fix is `#[cfg(test)]`.
 - Check that the feature is enabled only under `[dev-dependencies]`, never under `[dependencies]`.
 
-**Sources.** spider components/spider-core/src/types/id.rs, spider
-components/spider-core/Cargo.toml, y-scope/clp#2649, y-scope/clp#2690, clp
-components/clp-rust-libs/query-result-listener/Cargo.toml, clp components/api-server/Cargo.toml. See
-also: coding-style.md § What deserves a unit test (no test-only seams), TEST-7 (enabling the feature
-for a crate's own integration tests, and keeping mocks within the real contract).
+See also: coding-style.md § What deserves a unit test (no test-only seams), TEST-7 (enabling the
+feature for a crate's own integration tests, and keeping mocks within the real contract).
+
+**Sources.**
+
+- [spider `spider-core/src/types/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L42-L48): `Id::random()` is `pub` and only documented as for tests (the Bad example)
+- [spider `spider-core/Cargo.toml`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/Cargo.toml#L12): `rand` is a normal dependency of `spider-core`
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4438381331): reviewer questions an unused `test-utils` feature; `#[cfg(test)]` suffices
+- [y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690#discussion_r4530585669): integration tests made `SseEncoding` `pub`; move them into `src/sse.rs`
+- [clp `clp-rust-libs/query-result-listener/Cargo.toml`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/Cargo.toml#L10-L29): `test-utils` feature, enabled for its own tests from `[dev-dependencies]`
+- [clp `api-server/Cargo.toml`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/api-server/Cargo.toml#L46-L49): enables `test-utils` only under `[dev-dependencies]`
 
 ## MOD-9: Declare the intended visibility when staged code lands, and silence dead code with `expect`
 
@@ -6049,8 +6627,13 @@ mod job_registry;
 other `allow` or `expect`, and any clippy lint in particular, still follows coding-style.md §
 Linting: fix the code, or ask first.
 
-**Sources.** y-scope/clp#2676, y-scope/clp#2690, y-scope/spider#444, y-scope/spider#449,
-y-scope/spider#465
+**Sources.**
+
+- [y-scope/clp#2676](https://github.com/y-scope/clp/pull/2676#discussion_r4488093523): reviewer asks for final visibility instead of all-private, silencing `dead_code`
+- [y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690): the `sse` module expects `dead_code` outside tests until the endpoint lands
+- [y-scope/spider#444](https://github.com/y-scope/spider/pull/444): items are `pub(super)` for the coming core, with `expect(dead_code, reason)`
+- [y-scope/spider#449](https://github.com/y-scope/spider/pull/449): uses `cfg_attr(not(test), expect(...))` since its tests use every item
+- [y-scope/spider#465](https://github.com/y-scope/spider/pull/465): the shared reader lands `pub(super)` before its second consumer
 
 ## MOD-10: Keep Cargo features additive and declare optional dependencies with `dep:`
 
@@ -6087,9 +6670,12 @@ derive = ["dep:spider-tdl-derive"]
 - For a crate with two or more features, ask for `--no-default-features` and `--all-features` builds
   (or `cargo hack check --each-feature`) in CI or in the PR's testing notes.
 
-**Sources.** spider components/spider-tdl/Cargo.toml, spider taskfiles/lint.yaml, RustTraining
-rust-patterns-book/src/ch15-crate-architecture-and-api-design.md, RustTraining
-engineering-book/src/ch09-no-std-and-feature-verification.md
+**Sources.**
+
+- [spider `spider-tdl/Cargo.toml`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/Cargo.toml#L6-L8): `default = []` and `derive = ["dep:spider-tdl-derive"]`
+- [spider `taskfiles/lint.yaml`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/taskfiles/lint.yaml#L206-L215): clippy runs only with `--all-features`
+- [RustTraining rust-patterns-book § Feature Flags and Conditional Compilation](https://microsoft.github.io/RustTraining/rust-patterns-book/ch15-crate-architecture-and-api-design.html#feature-flags-and-conditional-compilation): use `dep:` and keep `default` minimal
+- [RustTraining engineering-book § Verifying Feature Combinations with `cargo-hack`](https://microsoft.github.io/RustTraining/engineering-book/ch09-no-std-and-feature-verification.html#verifying-feature-combinations-with-cargo-hack): build-check every feature combination
 
 # Testing and observability for correctness
 
@@ -6109,10 +6695,11 @@ event, also assert that the next poll yields `None`.
 
 **Why.** `is_err()` also passes when the code fails for the wrong reason. A framing error can hide
 the missing bounds check the test was written for. A stale-state rejection can be misclassified as
-an internal error that shuts down the service, which is what happened in y-scope/spider#515. A
-rejected call that consumed a queued item is a data-loss bug, and checking the variant alone does
-not catch it. A test that stops reading at `Ended` will not notice a stream that keeps yielding
-events or never closes. Consumers waiting for the end of that stream hang.
+an internal error that shuts down the service, which is what happened in
+[y-scope/spider#515](https://github.com/y-scope/spider/issues/515). A rejected call that consumed a
+queued item is a data-loss bug, and checking the variant alone does not catch it. A test that stops
+reading at `Ended` will not notice a stream that keeps yielding events or never closes. Consumers
+waiting for the end of that stream hang.
 
 ```rust,ignore
 // Bad
@@ -6161,10 +6748,17 @@ async fn get_job_outputs_rejects_unfinished_job() -> anyhow::Result<()> {
 **Exceptions.** A bare `is_err()` is fine only when every error is equally acceptable to the caller
 and the test name says so.
 
-**Sources.** y-scope/spider#515 (fixed in y-scope/spider#525), y-scope/spider#471 (spider-scheduler
-dispatch_queue.rs), spider components/spider-proto-rust/src/assignment.rs, spider
-components/spider-core/src/types/io/mod.rs, y-scope/clp#2705. See also: coding-style.md §
-Assertions, ERR-3 (if a test needs `to_string()`, a variant may be missing).
+See also: coding-style.md § Assertions, ERR-3 (if a test needs `to_string()`, a variant may be
+missing).
+
+**Sources.**
+
+- [y-scope/spider#515](https://github.com/y-scope/spider/issues/515): a stale-state rejection was treated as internal and shut down storage
+- [y-scope/spider#525](https://github.com/y-scope/spider/pull/525): the fix; its tests now expect the stale-state error
+- [y-scope/spider#471](https://github.com/y-scope/spider/pull/471): a rejected dequeue in `dispatch_queue.rs` must leave the queued assignment in place
+- [spider `spider-proto-rust/src/assignment.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/assignment.rs#L135-L164): conversion-error tests `matches!` the exact `Error` variant
+- [spider `spider-core/src/types/io/mod.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/io/mod.rs#L582-L636): `expect_err`, then destructure and check the `WireError` fields
+- [y-scope/clp#2705](https://github.com/y-scope/clp/pull/2705#pullrequestreview-5898835167): reviewer asks to assert the event stream ends after `End`
 
 ## TEST-2: Bound every wait in a test, and guard loops that must make progress
 
@@ -6178,7 +6772,7 @@ out, assert that each iteration made progress.
 Without a bound, the failure shows up as a CI job killed at its global limit, with no hint of which
 wait hung. A decode loop whose decoder returns `Some` without consuming input never ends, and it
 fills memory while it runs. In agent-driven test runs, this crashed the development VM twice
-(y-scope/clp#2649).
+([y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4449297472)).
 
 ```rust,ignore
 // Bad
@@ -6207,9 +6801,16 @@ while let Some(frame) = Frame::decode(&mut buffer)? {
 - In a test of deadline logic, set the outer timeout well above the deadline under test (for example
   `DEADLINE * 10`). It then catches a hang without racing the behavior being tested.
 
-**Sources.** y-scope/spider#541, y-scope/spider#555 (state/service/hooked_tests.rs),
-y-scope/spider#341, y-scope/spider#527, y-scope/spider#526, y-scope/clp#2649. See also:
-coding-style.md § Prefer real-time testing for complex async code.
+See also: coding-style.md § Prefer real-time testing for complex async code.
+
+**Sources.**
+
+- [y-scope/spider#541](https://github.com/y-scope/spider/pull/541#discussion_r4384836843): reviewer asks for a timeout on every `pause.reached(1)`
+- [y-scope/spider#555](https://github.com/y-scope/spider/pull/555): splits out `state/service/hooked_tests.rs`, whose hook waits take `HOOK_TIMEOUT`
+- [y-scope/spider#341](https://github.com/y-scope/spider/pull/341#pullrequestreview-4493746031): reviewer replaces a `recv` that could block forever with `try_recv`
+- [y-scope/spider#527](https://github.com/y-scope/spider/pull/527): deadline tests bound `wait_for_shutdown` at `TEST_DEADLINE * 10`
+- [y-scope/spider#526](https://github.com/y-scope/spider/pull/526): test that sends never block runs under a `timeout`
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4449297472): reviewer adds a progress assertion after a decode loop OOMed the VM
 
 ## TEST-3: Test each decision exhaustively, in the module that defines it
 
@@ -6218,11 +6819,12 @@ defined, with a table that has one row for every input variant. Do not test it o
 layer whose output merges variants, through a mock that re-implements its `match`, or through unit
 tests of a wrapper that only forwards to it.
 
-**Why.** In y-scope/clp#2617, the `Cancellable` and `CancellationRequested` cases both became
-HTTP 200. If `Pending` had mapped to the wrong variant, cancel would have done nothing, and every
-HTTP-level test would still have passed. A mock that copies the production `match` only tests the
-copy. A gRPC wrapper, or a service method that only forwards to its DB connector, has no logic of
-its own. A mock-based unit test of it only checks that the mock behaves like a mock.
+**Why.** In [y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617#discussion_r4390410031), the
+`Cancellable` and `CancellationRequested` cases both became HTTP 200. If `Pending` had mapped to the
+wrong variant, cancel would have done nothing, and every HTTP-level test would still have passed. A
+mock that copies the production `match` only tests the copy. A gRPC wrapper, or a service method
+that only forwards to its DB connector, has no logic of its own. A mock-based unit test of it only
+checks that the mock behaves like a mock.
 
 ```rust,ignore
 // Bad
@@ -6267,10 +6869,16 @@ fn from_status_maps_every_status() {
   connector in integration tests, and test mapping functions such as `status_to_error` once per
   status code (BND-9).
 
-**Sources.** y-scope/clp#2617 (clp-rust-utils job_config/search.rs), y-scope/clp#2581,
-y-scope/spider#364, y-scope/spider#358, y-scope/spider#347. See also: coding-style.md § What
-deserves a unit test ("Test a behavior once, where it's defined"); pr-review.md § Flag tests that
-don't test the code's own logic.
+See also: coding-style.md § What deserves a unit test ("Test a behavior once, where it's defined");
+pr-review.md § Flag tests that don't test the code's own logic.
+
+**Sources.**
+
+- [y-scope/clp#2617](https://github.com/y-scope/clp/pull/2617#discussion_r4390410031): reviewer asks for a per-status table test of `Cancellability` in `job_config/search.rs`
+- [y-scope/clp#2581](https://github.com/y-scope/clp/pull/2581#discussion_r4516943742): one invalid value per field pins the router's HTTP contract
+- [y-scope/spider#364](https://github.com/y-scope/spider/pull/364#discussion_r3517509984): reviewer rejects unit tests of the gRPC wrappers
+- [y-scope/spider#358](https://github.com/y-scope/spider/pull/358): `status_to_error` gets one test per status code it maps
+- [y-scope/spider#347](https://github.com/y-scope/spider/pull/347#pullrequestreview-4519930341): mock-DB tests of a forwarding service removed as testing only the mock
 
 ## TEST-4: Make concurrency tests contend, and make them reproducible
 
@@ -6324,10 +6932,13 @@ async fn concurrent_add_or_verify_converges_to_one_id() -> anyhow::Result<()> {
   that are otherwise unreachable, such as a closed dispatch queue failing the tick, are driven
   through `#[cfg(test)]` hooks on the real type (see TEST-7).
 
-**Sources.** y-scope/spider#493 (spider-storage tests/mariadb_test.rs), spider
-components/spider-scheduler/src/dispatch_queue.rs:285 (`run_pair_consistency_stress`), spider
-components/spider-scheduler/src/core_impl/inbound_queue_reader.rs:488, spider
-components/spider-core/src/session.rs:477, y-scope/spider#395.
+**Sources.**
+
+- [y-scope/spider#493](https://github.com/y-scope/spider/pull/493#discussion_r4089491840): reviewer asks for more concurrency in `tests/mariadb_test.rs` so adds actually race
+- [spider `spider-scheduler/src/dispatch_queue.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/dispatch_queue.rs#L272-L388): `run_pair_consistency_stress`: seeded batch sizes, owner tagged at enqueue
+- [spider `spider-scheduler/src/core_impl/inbound_queue_reader.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/core_impl/inbound_queue_reader.rs#L487-L497): semaphore-gated mock poll (`gate_ready_lane`, `admit_ready_poll`)
+- [spider `spider-core/src/session.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/session.rs#L91-L105): `concurrent_advance_converges_to_max` on a `multi_thread` runtime
+- [y-scope/spider#395](https://github.com/y-scope/spider/pull/395): property test checks every rescheduled task is dispatched exactly twice
 
 ## TEST-5: Keep tests independent of process-global and shared state
 
@@ -6384,10 +6995,15 @@ spider-storage reading DB credentials (BND-5), every test that touches the varia
 and a guard restores the variable before the first assertion so that a failed assertion cannot leak
 it.
 
-**Sources.** y-scope/clp#2438 (review: "I prefer not to add this test case since it mutates the env
-var"), clp components/clp-tdl-package/src/task/compression/compress.rs, y-scope/spider#397
-(spider-storage src/config.rs), y-scope/spider#299, y-scope/spider#314, y-scope/spider#339,
-RustTraining rust-patterns-book/src/ch14-testing-and-benchmarking-patterns.md.
+**Sources.**
+
+- [y-scope/clp#2438](https://github.com/y-scope/clp/pull/2438#discussion_r3692334370): "I prefer not to add this test case since it mutates the env var"
+- [clp `clp-tdl-package/src/task/compression/compress.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-tdl-package/src/task/compression/compress.rs#L708-L787): `run_clp_s` hands credentials to the child via `Command::envs`
+- [y-scope/spider#397](https://github.com/y-scope/spider/pull/397): `src/config.rs` reads DB credentials from env, with env-mutating tests
+- [y-scope/spider#299](https://github.com/y-scope/spider/pull/299#discussion_r3048927055): reviewer rejects a nextest rule keyed on a `test_serial` prefix
+- [y-scope/spider#314](https://github.com/y-scope/spider/pull/314#discussion_r3162452837): a size check on a shared table breaks on rows left by other tests
+- [y-scope/spider#339](https://github.com/y-scope/spider/pull/339#pullrequestreview-4471850284): reviewer adds `ignore` for MariaDB tests and `#[serial_test::file_serial]`
+- [RustTraining rust-patterns-book § Test Fixtures and Setup](https://microsoft.github.io/RustTraining/rust-patterns-book/ch14-testing-and-benchmarking-patterns.html#test-fixtures-and-setup): per-test fixtures and a temp directory cleaned up on drop
 
 ## TEST-6: Take the current time, output streams and awaited futures as inputs of the decision logic
 
@@ -6437,11 +7053,16 @@ pool.run_gc_cycle_at(registered_at + SOFT_TIMEOUT + Duration::from_millis(1)).aw
 - Reject a `foo`/`foo_with_clock` pair, or a parameter that exists only to inject internal state.
   That is the seam coding-style.md forbids.
 
-**Sources.** spider components/spider-storage/src/task_instance_pool.rs:390, spider
-components/spider-storage/src/state/job_cache_gc.rs:217, y-scope/spider#418
-(executor_log_collection.rs `BrokenWriter`), y-scope/spider#527 (`wait_for_shutdown`), RustTraining
-rust-patterns-book/src/ch14-testing-and-benchmarking-patterns.md. See also: coding-style.md § What
-deserves a unit test ("Don't add test-only seams to production code").
+See also: coding-style.md § What deserves a unit test ("Don't add test-only seams to production
+code").
+
+**Sources.**
+
+- [spider `spider-storage/src/task_instance_pool.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/task_instance_pool.rs#L390-L448): `run_gc_cycle_at(gc_started_at: SystemTime)`; the run loop passes `SystemTime::now()`
+- [spider `spider-storage/src/state/job_cache_gc.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/state/job_cache_gc.rs#L212-L231): `run_gc_cycle_at(now: Instant)` judges expiry against the given instant
+- [y-scope/spider#418](https://github.com/y-scope/spider/pull/418): log actor is generic over `AsyncWrite`, so tests inject `BrokenWriter`
+- [y-scope/spider#527](https://github.com/y-scope/spider/pull/527): `wait_for_shutdown` takes the server's handle, so tests pass `pending()`
+- [RustTraining rust-patterns-book § Mocking Strategies without Frameworks](https://microsoft.github.io/RustTraining/rust-patterns-book/ch14-testing-and-benchmarking-patterns.html#mocking-strategies-without-frameworks): passing the clock in so a test can fix the time
 
 ## TEST-7: Keep test doubles within the real contract, and gate test-only code out of production
 
@@ -6488,17 +7109,26 @@ spider-core = { path = ".", features = ["test-utils"] }
 
 **Exceptions.** Fault-injection hooks that must sit on production code paths stay behind a feature,
 such as spider-storage's `test-hooks`. Without the feature, the hooks type is zero-sized and its
-fault type has no values (`enum InjectedFault {}`, see TLC-6), so every `?` on a hook compiles away.
+fault type has no values (`enum InjectedFault {}`, see TLC-5), so every `?` on a hook compiles away.
 Hooks live on each runtime instance, not in globals. A test target that cannot run at all without
 such a feature may use `required-features`. Gating code behind a feature does not make a forbidden
 seam acceptable (coding-style.md § What deserves a unit test).
 
-**Sources.** spider components/spider-core/src/types/id.rs:42, spider
-components/spider-core/Cargo.toml, clp components/clp-rust-libs/query-result-listener/Cargo.toml,
-y-scope/clp#2696, y-scope/clp#2664, y-scope/clp#2690, y-scope/clp#2689, y-scope/spider#541
-(test_hooks/disarmed.rs), y-scope/spider#493 (state/test_utils.rs), y-scope/spider#551,
-y-scope/spider#557. See also: coding-style.md § Panic in test helpers when the failure means the
-test is wrong.
+See also: coding-style.md § Panic in test helpers when the failure means the test is wrong.
+
+**Sources.**
+
+- [spider `spider-core/src/types/id.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/src/types/id.rs#L42-L48): ungated `pub fn random()`, documented as test-only
+- [spider `spider-core/Cargo.toml`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-core/Cargo.toml#L12): `rand` is a normal dependency, so every binary pulls it in
+- [clp `clp-rust-libs/query-result-listener/Cargo.toml`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/Cargo.toml#L10-L29): `test-utils` feature enabled by a dev-dependency on the crate itself
+- [y-scope/clp#2696](https://github.com/y-scope/clp/pull/2696): picks the self dev-dependency over `[[test]] required-features`, and says why
+- [y-scope/clp#2664](https://github.com/y-scope/clp/pull/2664#discussion_r4474431710): reviewer asks to make the test-only encodings test config only
+- [y-scope/clp#2690](https://github.com/y-scope/clp/pull/2690#discussion_r4530585669): a binary crate's tests belong in `src/sse.rs`, not `tests/`
+- [y-scope/clp#2689](https://github.com/y-scope/clp/pull/2689#issuecomment-6745445395): public-API-only `FakeClpS` tests belong in `tests/`
+- [y-scope/spider#541](https://github.com/y-scope/spider/pull/541): `test-hooks` feature; without it the hooks (`test_hooks/disarmed.rs`) are no-ops
+- [y-scope/spider#493](https://github.com/y-scope/spider/pull/493#discussion_r4089475586): mock in `state/test_utils.rs` returns an error outside the trait contract
+- [y-scope/spider#551](https://github.com/y-scope/spider/pull/551#discussion_r4437929238): reviewer asks to make a fixture helper a method of `TreeEnv`
+- [y-scope/spider#557](https://github.com/y-scope/spider/pull/557#discussion_r4488738816): reviewer asks to make fixture helpers methods of `TestEnv`
 
 ## TEST-8: Assert invariants over every output of hand-written algorithms and decoders
 
@@ -6548,11 +7178,15 @@ assert_eq!(unassigned, BTreeSet::new());
 **Exceptions.** Do not property-test or round-trip-test `#[derive(Serialize, Deserialize)]` types or
 serde attributes. That is derived behavior (coding-style.md § What deserves a unit test).
 
-**Sources.** y-scope/clp#2403 (compression-coordinator partition.rs), y-scope/clp#2649
-(query-result-listener protocol.rs), y-scope/clp#2375, RustTraining
-rust-patterns-book/src/ch14-testing-and-benchmarking-patterns.md, RustTraining
-engineering-book/src/ch04-code-coverage-seeing-what-tests-miss.md. See also: DEF-9 (checked
-decoding).
+See also: DEF-4 (checked decoding).
+
+**Sources.**
+
+- [y-scope/clp#2403](https://github.com/y-scope/clp/pull/2403#pullrequestreview-4739365794): reviewer adds exactly-once and loop-postcondition invariants to `partition.rs`, mutation-verified
+- [y-scope/clp#2649](https://github.com/y-scope/clp/pull/2649#discussion_r4438333071): reviewer asks for a byte-at-a-time decoding test in `protocol.rs`
+- [y-scope/clp#2375](https://github.com/y-scope/clp/pull/2375#discussion_r3815340863): compare decoded objects, not hex, so field order isn't contract
+- [RustTraining rust-patterns-book § Property-Based Testing (proptest)](https://microsoft.github.io/RustTraining/rust-patterns-book/ch14-testing-and-benchmarking-patterns.html#property-based-testing-proptest): properties asserted over generated inputs
+- [RustTraining engineering-book § Complementary Testing Tools](https://microsoft.github.io/RustTraining/engineering-book/ch04-code-coverage-seeing-what-tests-miss.html#complementary-testing-tools): a proptest that parsing arbitrary input never panics
 
 ## TEST-9: Log structured fields with the full error, and attach spans to spawned work with `.instrument`
 
@@ -6609,17 +7243,21 @@ tokio::spawn(compress(job).instrument(span));
 are not used in spider or clp yet, so add them to new long-lived spawned tasks rather than
 retrofitting existing code all at once.
 
-**Sources.** spider components/spider-scheduler/src/runtime.rs:148, spider
-components/spider-storage/src/cache/tree/planner.rs:111, clp
-components/clp-tdl-package/src/task/compression/mod.rs:83, y-scope/clp#2607 (log the full error, not
-its kind), RustTraining async-book/src/ch12-common-pitfalls.md, RustTraining
-c-cpp-book/src/ch17-4-logging-and-tracing-ecosystem.md. See also: coding-style.md § Log field
-formatting, § Error messages, ERR-5 (where to log).
+See also: coding-style.md § Log field formatting, § Error messages, ERR-5 (where to log).
+
+**Sources.**
+
+- [spider `spider-scheduler/src/runtime.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-scheduler/src/runtime.rs#L148-L152): `tracing::error!` with `scheduler_id` and `error` as fields
+- [spider `spider-storage/src/cache/tree/planner.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-storage/src/cache/tree/planner.rs#L454-L459): `tracing::warn!` with `job_id` and sizes as fields
+- [clp `clp-tdl-package/src/task/compression/mod.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-tdl-package/src/task/compression/mod.rs#L82-L84): commit failure logged with the job ID and full error as fields
+- [y-scope/clp#2607](https://github.com/y-scope/clp/pull/2607): logs the full error for every 500 instead of an error kind
+- [RustTraining async-book § tracing + `#[instrument]`: Structured Logging for Async](https://microsoft.github.io/RustTraining/async-book/ch12-common-pitfalls.html#tracing--instrument-structured-logging-for-async): `#[instrument(skip(..), fields(..))]` spans stay open across `.await`
+- [RustTraining c-cpp-book § The `tracing` crate — structured logging with spans](https://microsoft.github.io/RustTraining/c-cpp-book/ch17-4-logging-and-tracing-ecosystem.html#the-tracing-crate--structured-logging-with-spans): key-value fields instead of string interpolation
 
 ## TEST-10: Pin type-level guarantees with compile-fail tests
 
 **Rule.** When correctness depends on some code *not* compiling, keep it that way with a
-compile-fail test. Examples: a typestate method that does not exist in some state (TLC-10), a
+compile-fail test. Examples: a typestate method that does not exist in some state (TLC-9), a
 single-use token that is not `Clone` (TLC-4), a macro that rejects a bad signature or duplicate
 names. Use `trybuild` with checked-in `.stderr` files for macros or several cases. A `compile_fail`
 doctest is enough for one case on a library type.
@@ -6667,9 +7305,12 @@ with coding-style.md § Coding-agent driven test case writing ("Do not test what
 makes unreachable"). That rule is about runtime tests of impossible arms; this one checks that the
 type system keeps those arms impossible.
 
-**Sources.** spider components/spider-tdl/tests/test_task_macro.rs, spider
-components/spider-tdl/src/register.rs:91 and :255, RustTraining
-type-driven-correctness-book/src/ch14-testing-type-level-guarantees.md.
+**Sources.**
+
+- [spider `spider-tdl/tests/test_task_macro.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/tests/test_task_macro.rs): `#[task]` tests cover only definitions that compile
+- [spider `spider-tdl/src/register.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/register.rs#L91-L95): `register_tdl_package!` emits the `const _` name-uniqueness assertion
+- [spider `spider-tdl/src/register.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-tdl/src/register.rs#L254-L268): duplicate names tested only as a runtime panic of the helper
+- [RustTraining type-driven-correctness-book § Compile-Fail Tests with `trybuild`](https://microsoft.github.io/RustTraining/type-driven-correctness-book/ch14-testing-type-level-guarantees.html#compile-fail-tests-with-trybuild): `trybuild` cases with checked-in `.stderr` expectations
 
 # Review checklist
 
@@ -6710,9 +7351,9 @@ first section: most bugs these rules prevent sit in code that looks unrelated to
   positional `bool` is stored in a tuple/queue/message, or a full-status parameter is followed by
   `assert!(is_terminal())` with 3+ or data-carrying terminal states; use a named outcome enum (named
   `bool` parameters stay).
-- **TYPE-10**: A `Vec<u8>` whose encoding lives only in a comment, a hand-built encoded buffer, or a
-  secret crossing an API as `Vec<u8>`/`String`, held in a `derive(Debug)` struct, or compared with
-  `==`; use an encoding newtype with `decode()`, `SecretSlice`, and `ConstantTimeEq`.
+- **TYPE-10**: A `Vec<u8>` whose encoding lives only in a comment, `from_utf8_lossy` on non-text
+  bytes, or a hand-built encoded buffer; use an encoding newtype built by the encoder and read
+  through `decode()`.
 
 ## Checklist: Type-level constraints, traits and generics
 
@@ -6730,79 +7371,74 @@ first section: most bugs these rules prevent sit in code that looks unrelated to
   itself.
 - **TLC-4**: A permit/proof type with `Clone`/`Copy`/`Default`/`Deserialize`, `pub` fields or a
   public constructor.
-- **TLC-4**: A spend-once operation on a shared `&self` handle, or a `bool` parameter asserting a
-  security or readiness fact.
-- **TLC-5**: A public handle or async method that must be spawnable without a compile-time
-  `Send`/`Sync` assertion (one per method for the futures).
-- **TLC-5**: A native `async fn` in a trait whose futures are spawned, or
-  `#[allow(async_fn_in_trait)]`.
-- **TLC-6**: A trait generic parameter that each type implements only once (should be an associated
+- **TLC-4**: A spend-once operation on a shared `&self` handle, an async spend that updates its
+  accounting before a cancellable `.await`, or a `bool` parameter asserting a security or readiness
+  fact.
+- **TLC-5**: A trait generic parameter that each type implements only once (should be an associated
   type).
-- **TLC-6**: A placeholder error type on an infallible impl, or `#[cfg]` repeated at every
+- **TLC-5**: A placeholder error type on an infallible impl, or `#[cfg]` repeated at every
   optional-hook call site, instead of `Infallible`/an empty enum.
-- **TLC-7**: A struct field or `&self` factory for a stateless strategy; ask for a type-only trait
+- **TLC-6**: A struct field or `&self` factory for a stateless strategy; ask for a type-only trait
   and an empty enum.
-- **TLC-8**: A trait used as `dyn` with a `Clone`/`Sized` supertrait, a by-value `self` method, or a
-  generic method.
-- **TLC-8**: `Box<dyn Any>` plus `downcast_ref` where an enum or a typed-trait/erased-trait bridge
-  belongs.
-- **TLC-9**: The same inherent method copied across crates where one extension trait with a blanket
+- **TLC-7**: A by-value `self` method on a trait used as `dyn` (needs `self: Box<Self>`, or
+  `where Self: Sized` if it's only for concrete types).
+- **TLC-8**: The same inherent method copied across crates where one extension trait with a blanket
   impl belongs.
-- **TLC-9**: A blanket impl over a broad bound (`Debug`, `Display`, `Serialize`) for behavior some
+- **TLC-8**: A blanket impl over a broad bound (`Debug`, `Display`, `Serialize`) for behavior some
   types must override.
-- **TLC-9**: A mock made `Clone` only to satisfy `Trait + Clone` where a forwarding `Arc<T: ?Sized>`
+- **TLC-8**: A mock made `Clone` only to satisfy `Trait + Clone` where a forwarding `Arc<T: ?Sized>`
   impl belongs (OWN-6).
-- **TLC-10**: A runtime state guard repeated in three or more methods of a compile-time-ordered
+- **TLC-9**: A runtime state guard repeated in three or more methods of a compile-time-ordered
   protocol.
-- **TLC-10**: A typestate wrapper with `Option` fields plus `expect`, or a transition taking
+- **TLC-9**: A typestate wrapper with `Option` fields plus `expect`, or a transition taking
   `&mut self`; and no typestate asked for two-phase or runtime-loaded state.
 
 ## Checklist: Defensive programming
 
-- **DEF-1**: `_ =>` or an unused `other =>` arm in a match over a workspace enum, or a
-  `matches!`/`is_*()` classification a new variant should have updated.
-- **DEF-1**: `#[non_exhaustive]` on an enum other workspace crates match on, or a field-by-field
-  struct conversion without a full destructure.
-- **DEF-2**: A `?` on a request-dependent check after the first mutation, or a config value reaching
+- **DEF-1**: A `?` on a request-dependent check after the first mutation, or a config value reaching
   a panicking constructor (`mpsc::channel(0)`, `Semaphore::new`) after a durable write.
-- **DEF-2**: An unavoidable partial mutation (DB then cache) with no armed drop guard that fails the
+- **DEF-1**: An unavoidable partial mutation (DB then cache) with no armed drop guard that fails the
   service if dropped.
-- **DEF-3**: `contains_key`/`get` then `insert`, `load` then `store`, or a status read and write in
-  separate locks/statements instead of `entry()`, one CAS or `SELECT ... FOR UPDATE`.
-- **DEF-3**: An `UPDATE ... SET status` without a from-state guard, an ignored `rows_affected`, or a
-  cursor/epoch assigned from an `Option` fetch or a raw `set`.
-- **DEF-4**: `unwrap_or(<literal>)`, `unwrap_or_default()` or `_ => <valid variant>` when parsing
-  external data, or a request option silently ignored or downgraded.
-- **DEF-4**: User payload quoted/wrapped to make it parse, or a request string joined into a path
-  without `Component::Normal`/containment checks.
-- **DEF-5**: A request- or config-sized duration, count, allocation, decompression or drain with no
-  `MAX_` cap at the boundary, or a limit enforced on only some output paths.
-- **DEF-5**: A raised limit whose dependent limits are not rechecked and pinned with
-  `const _: () = assert!(..)`, or a `clamp` whose computed lower bound can exceed the upper.
-- **DEF-6**: `expect`/`assert!`/`unreachable!` on a condition input, a peer, the clock, randomness
-  or a race can break.
-- **DEF-6**: `expect`/`panic!` in a spawned service loop on shared state another component
-  maintains, instead of cancelling the root token or returning an `Internal` error.
-- **DEF-6**: A comment stating an assumption about a constant or limit relation that should be a
-  const assert.
-- **DEF-7**: A retry loop without a classifier, budget, capped backoff and jitter, or an error arm
-  that `continue`s without sleeping.
-- **DEF-7**: A non-idempotent create/register/enqueue under retry without an idempotency key or
-  deterministic ID, or random output names for retriable tasks.
-- **DEF-7**: A permanent error retried on every poll tick, or `let _ = op().await` used to make a
-  replay idempotent instead of matching the one already-done variant.
-- **DEF-8**: Unchecked `+`/`-`/`*`/`<<`/`fetch_sub` on input-derived values or meaningful counters
+- **DEF-2**: `contains_key`/`get` then `insert` on a concurrent map, `load` then `store` on an
+  atomic, or a read and a write under separate lock guards, instead of `entry()`, one CAS or one
+  guard.
+- **DEF-3**: Unchecked `+`/`-`/`*`/`<<`/`fetch_sub` on input-derived values or meaningful counters
   (lossy `as` casts are TYPE-8).
-- **DEF-8**: `Instant + Duration` with a caller-controlled duration, or a test gated on
+- **DEF-3**: `Instant + Duration` with a caller-controlled duration, or a test gated on
   `debug_assertions`/`should_panic(expected = "overflow")`.
-- **DEF-9**: `[]` indexing, range slicing or `as usize` on an input-derived offset/length, or a
+- **DEF-4**: `[]` indexing, range slicing or `as usize` on an input-derived offset/length, or a
   manual `pos + len > len` check before a slice.
-- **DEF-9**: `with_capacity`/`reserve`/`vec![_; n]` sized by an input-declared count without capping
+- **DEF-4**: `with_capacity`/`reserve`/`vec![_; n]` sized by an input-declared count without capping
   to remaining bytes.
-- **DEF-10**: An `unsafe` block without a `// SAFETY:` invariant, or a `# Safety` section on a safe
+- **DEF-5**: An `unsafe` block without a `// SAFETY:` invariant, or a `# Safety` section on a safe
   `fn`.
-- **DEF-10**: An `extern "C"` export (including macro-generated) without `catch_unwind`, or an owned
+- **DEF-5**: An `extern "C"` export (including macro-generated) without `catch_unwind`, or an owned
   FFI buffer without `Drop`.
+
+## Checklist: Server design
+
+- **SRV-1**: A cursor, epoch or session ID written with a raw `set`/`store` or assigned from an
+  `Option` fetch, or epoch-stamped work checked only once.
+- **SRV-2**: `unwrap_or(<literal>)`, `unwrap_or_default()` or `_ => <valid variant>` when parsing
+  external data, or a request option silently ignored or downgraded.
+- **SRV-2**: User payload quoted/wrapped to make it parse, or a request string joined into a path
+  without `Component::Normal`/containment checks.
+- **SRV-3**: A request- or config-sized duration, count, allocation, decompression or drain with no
+  `MAX_` cap at the boundary, or a limit enforced on only some output paths.
+- **SRV-3**: A raised limit whose dependent limits are not rechecked and pinned with
+  `const _: () = assert!(..)`, or a `clamp` whose computed lower bound can exceed the upper.
+- **SRV-4**: `expect`/`assert!`/`unreachable!` on a condition input, a peer, the clock, randomness
+  or a race can break.
+- **SRV-4**: `expect`/`panic!` in a spawned service loop on shared state another component
+  maintains, instead of cancelling the root token or returning an `Internal` error.
+- **SRV-4**: A comment stating an assumption about a constant or limit relation that should be a
+  const assert.
+- **SRV-5**: A retry loop without a classifier, budget, capped backoff and jitter, or an error arm
+  that `continue`s without sleeping.
+- **SRV-5**: A non-idempotent create/register/enqueue under retry without an idempotency key or
+  deterministic ID, or random output names for retriable tasks.
+- **SRV-5**: A permanent error retried on every poll tick, or `let _ = op().await` used to make a
+  replay idempotent instead of matching the one already-done variant.
 
 ## Checklist: Error handling
 
@@ -6924,8 +7560,8 @@ first section: most bugs these rules prevent sit in code that looks unrelated to
   an actor that exits without draining and answering pending requests; an interval without
   `MissedTickBehavior`.
 - **ASYNC-10**: An `async fn` whose call-time side effect (send, reservation) only runs when polled,
-  instead of a sync fn returning `impl Future + Send + use<>`; public spawnable futures lacking
-  per-method compile-time `Send` assertions (TLC-5).
+  instead of a sync fn returning `impl Future + Send + use<>`; a public client crate's async methods
+  lacking per-method compile-time `Send` assertions; `#[async_trait(?Send)]` on a spawned trait.
 
 ## Checklist: Serialization, config and external boundaries
 
@@ -6963,8 +7599,9 @@ first section: most bugs these rules prevent sit in code that looks unrelated to
   lossy decoding without a strict parse.
 - **BND-7**: A child process spawned via `sh -c` with an interpolated string, without
   `kill_on_drop(true)`, or with stderr discarded on failure.
-- **BND-8**: A password/secret/token held as `String`/`Vec<u8>` on a `Debug`/`Serialize` type, a
-  credential compared with `==`, or a credential field serialized.
+- **BND-8**: A password/secret/token held as `String`/`Vec<u8>` on a `Debug`/`Serialize` type or
+  passed across an API as `String`/`Vec<u8>`, a credential compared with `==`, or a credential field
+  serialized.
 - **BND-8**: A session token, presigned URL or credential logged on an accept/success path.
 - **BND-9**: Status codes decoded outside a single `status_to_error`, a server status change without
   the matching client decoder change, or no per-code decoder test.
