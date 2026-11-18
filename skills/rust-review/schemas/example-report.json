@@ -1,0 +1,53 @@
+{
+  "commit": "ea7f70e49fa44fc8fe1ce4659b2134d2263723d6",
+  "base": "1a349f4bcc33a25de38be13446dcfb059f1a6c26",
+  "target": "em/forward-child-submission",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "description": "`register_children` maps every `sqlx::Error` to `JobNotFound` with a catch-all `Err(_)` arm, so a dropped connection is reported to the client as a missing job.",
+      "references": [
+        "ERR-2"
+      ],
+      "file": "components/spider-storage/src/db/mariadb/job.rs",
+      "line_range": [
+        212,
+        219
+      ],
+      "in_diff": true,
+      "suggestion": "Match `sqlx::Error::RowNotFound` only and propagate every other error with `?`.",
+      "diff": null
+    },
+    {
+      "id": "F2",
+      "severity": "should-fix",
+      "description": "The `# Errors` section of `submit_job` lists five variants the function never returns directly and omits the forwarded `submit_job` call.",
+      "references": [
+        "linter:errors-doc",
+        "coding-style.md#symbol-level-docstrings"
+      ],
+      "file": "components/spider-client/src/client.rs",
+      "line_range": [
+        40,
+        48
+      ],
+      "in_diff": true,
+      "suggestion": "Replace the variant bullets with \"* Forwards [`JobClient::submit_job`]'s return values on failure.\"",
+      "diff": null
+    },
+    {
+      "id": "F3",
+      "severity": "nit",
+      "description": "The PR title has no scope and doesn't end with a period.",
+      "references": [
+        "pr-review.md#pr-title-convention"
+      ],
+      "file": null,
+      "line_range": null,
+      "in_diff": true,
+      "suggestion": "Use `feat(spider-execution-manager): Forward child-job submissions to the storage service.`",
+      "diff": null
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finding.json",
+  "title": "Finding",
+  "description": "One guideline violation found in the reviewed change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "severity",
+    "description",
+    "references",
+    "file",
+    "line_range",
+    "in_diff",
+    "suggestion",
+    "diff"
+  ],
+  "properties": {
+    "id": {
+      "description": "F1, F2, ... Reviewers number their own findings; the final report renumbers them.",
+      "type": "string",
+      "pattern": "^F[1-9][0-9]*$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["blocking", "should-fix", "nit"]
+    },
+    "description": {
+      "description": "What is wrong at the cited lines and why it violates the referenced rules.",
+      "type": "string",
+      "minLength": 1
+    },
+    "references": {
+      "description": "Rule IDs (ERR-4), linter rules (linter:errors-doc), or guide sections without IDs (coding-style.md#test-names, pr-review.md#pr-title-convention).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^([A-Z]+-[1-9][0-9]*|linter:[a-z0-9-]+|(coding-style|pr-review)\\.md#[^\\s#]+)$"
+      }
+    },
+    "file": {
+      "description": "Path relative to the repository root, or null for a finding about the PR itself (e.g. its title).",
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "line_range": {
+      "description": "Inclusive 1-based [start, end] on the reviewed commit, or null when no line applies.",
+      "type": ["array", "null"],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "in_diff": {
+      "description": "Whether the change under review introduced the violation; false for pre-existing problems in surrounding code.",
+      "type": "boolean"
+    },
+    "suggestion": {
+      "description": "The fix to make, in prose.",
+      "type": "string",
+      "minLength": 1
+    },
+    "diff": {
+      "description": "A unified diff (a/ and b/ prefixes, paths from the repository root) that applies with `git apply` at the reviewed commit, or null.",
+      "type": ["string", "null"]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "report.json",
+  "title": "Rust review report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commit", "base", "target", "findings"],
+  "properties": {
+    "commit": {
+      "description": "The reviewed commit. For the `local` target, HEAD of the working tree under review.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "base": {
+      "description": "The commit the change is diffed against (the merge base with the base branch).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "target": {
+      "description": "The target given to setup.sh: a PR number, a branch, or `local`.",
+      "type": "string",
+      "minLength": 1
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "finding.json"
+      }
+    }
+  }
+}
