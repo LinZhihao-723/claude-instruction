@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Builds and checks the Rust coding-practice guide.
 
 The script does two things:
@@ -11,8 +15,10 @@ The script does two things:
 
 Usage:
 
-    python3 rust/coding-practice/tools/build.py          # regenerate, then check links
-    python3 rust/coding-practice/tools/build.py --check  # fail if stale or any link is broken
+    uv run rust/coding-practice/tools/build.py          # regenerate, then check links
+    uv run rust/coding-practice/tools/build.py --check  # fail if stale or any link is broken
+
+The script can also be run directly, as `rust/coding-practice/tools/build.py [--check]`.
 """
 
 import argparse
