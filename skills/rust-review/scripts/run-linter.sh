@@ -3,8 +3,8 @@
 #
 # Usage: run-linter.sh <rule> <bundle>
 #
-# Prints one diagnostic per line (`<path>:<line>:<column>: <code>: <message>`, paths relative to
-# the worktree root) and saves the output to `<bundle>/linter/<rule>.txt`. Exits 0 when clean, 1
+# Prints one diagnostic per line (`<path>:<line>:<column>: <code> <name>: <message>`, paths relative
+# to the worktree root) and saves the output to `<bundle>/linter/<rule>.txt`. Exits 0 when clean, 1
 # when there are diagnostics and 2 on an error, including a missing linter. Set YSCOPE_RUST_LINTER
 # to use a binary that isn't on PATH.
 

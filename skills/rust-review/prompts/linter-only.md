@@ -19,13 +19,15 @@ Parameters:
 
    Exit code 0 means no diagnostics, 1 means diagnostics, 2 means an error. On exit code 0 or 2,
    return `{"findings": []}`.
-3. Convert each `<path>:<line>:<column>: <code>: <message>` line into one finding:
+3. Convert each `<path>:<line>:<column>: <code> <name>: <message>` line into one finding. `<code>`
+   is the stable code, such as `DOC001`, and `<name>` the rule or meta name, such as
+   `comment-greedy-wrap`:
    - `file`: `<path>`; `line_range`: `[<line>, <line>]`; `in_diff`: true (the linter only reports
      changed lines).
-   - `references`: `linter:<code>`, where `<code>` is the code printed on the line.
-   - `severity`: `nit` for `comment-greedy-wrap`, `should-fix` for every other code. Skip
+   - `references`: `linter:<name>`, where `<name>` is the name printed on the line, not the code.
+   - `severity`: `nit` for `comment-greedy-wrap`, `should-fix` for every other name. Skip
      `parse-error` lines.
-   - `description`: the linter's message, prefixed with the code, for example
+   - `description`: the linter's message, prefixed with the name, for example
      "`comment-greedy-wrap`: line is 40 columns wide ...".
    - `suggestion`: the fix the message asks for, in a sentence.
    - `diff`: null.

@@ -22,9 +22,10 @@ Parameters:
    <skill_dir>/scripts/run-linter.sh LINTER_RULE BUNDLE
    ```
 
-   It prints `<path>:<line>:<column>: <code>: <message>` lines. Exit code 0 means no diagnostics, 1
-   means diagnostics, 2 means an error. If the linter isn't installed or fails, note it to yourself
-   and continue with the manual pass alone.
+   It prints `<path>:<line>:<column>: <code> <name>: <message>` lines, such as `DOC001
+   comment-greedy-wrap`. Exit code 0 means no diagnostics, 1 means diagnostics, 2 means an error.
+   If the linter isn't installed or fails, note it to yourself and continue with the manual pass
+   alone.
 4. Triage each diagnostic: open the line in the worktree and check it against the documentation.
    Report the ones you agree with. Drop the false positives (diagnostics the documentation's own
    rules don't support). Report a meta diagnostic (`invalid-suppression`, `unused-suppression`) as
