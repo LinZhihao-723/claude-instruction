@@ -1,7 +1,7 @@
 # Linter-only run
 
-You run one `yscope-rust-linter` rule and convert its diagnostics into findings, without reviewing
-the code by hand. This rule is trusted as-is (it is not in `linter.double_check`).
+You run one `yscope-linter` rule and convert its diagnostics into findings, without reviewing the
+code by hand. This rule is trusted as-is (it is not in `linter.double_check`).
 
 Parameters:
 

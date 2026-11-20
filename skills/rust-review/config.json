@@ -16,6 +16,6 @@
       "trait-params-doc"
     ],
     "include_tests": false,
-    "rule_doc_url": "https://raw.githubusercontent.com/LinZhihao-723/yscope-rust-linter/main/docs/rules/{rule}.md"
+    "rule_doc_url": "https://raw.githubusercontent.com/y-scope/yscope-linter/main/docs/rules/{rule}.md"
   }
 }

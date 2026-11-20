@@ -110,7 +110,7 @@ check("a diff with wrong hunk counts is recounted", "@@ -5,3 +5,3 @@" in (checke
 check("a diff that doesn't apply is set to null", checked[2]["diff"] is None)
 check("check-diffs.sh leaves the worktree untouched", "line 2\n" in (repo / "lib.rs").read_text())
 
-# run-linter.sh falls back to the bundle's `linter.binary` when YSCOPE_RUST_LINTER is unset.
+# run-linter.sh falls back to the bundle's `linter.binary` when YSCOPE_LINTER is unset.
 stub = work_dir / "stub-linter"
 stub.write_text('#!/usr/bin/env bash\necho "stub-linter $*"\n', encoding="utf-8")
 stub.chmod(0o755)
@@ -121,7 +121,7 @@ rust_review.write_json(
     {"worktree": str(repo), "linter": {"binary": str(stub), "include_tests": False}},
 )
 (linter_bundle / "diff-rs-U0.patch").write_text(diffs["good"], encoding="utf-8")
-env = {k: v for k, v in os.environ.items() if k != "YSCOPE_RUST_LINTER"}
+env = {k: v for k, v in os.environ.items() if k != "YSCOPE_LINTER"}
 result = subprocess.run(
     [str(skill_dir / "scripts" / "run-linter.sh"), "errors-doc", str(linter_bundle)],
     capture_output=True,

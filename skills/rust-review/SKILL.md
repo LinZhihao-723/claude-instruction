@@ -1,6 +1,6 @@
 ---
 name: rust-review
-description: Review Rust code changes against the y-scope Rust guidelines (coding-practice rule sets, coding-style.md, pr-review.md) and the yscope-rust-linter rules, producing a JSON report of verified findings. Use when asked to review a Rust PR, branch, commit or local diff in a y-scope repository (Spider, CLP Rust components), or to check Rust changes against the y-scope guidelines.
+description: Review Rust code changes against the y-scope Rust guidelines (coding-practice rule sets, coding-style.md, pr-review.md) and the yscope-linter rules, producing a JSON report of verified findings. Use when asked to review a Rust PR, branch, commit or local diff in a y-scope repository (Spider, CLP Rust components), or to check Rust changes against the y-scope guidelines.
 ---
 
 # Rust review
@@ -14,11 +14,11 @@ review, or pass `--repo <dir>` to `setup.sh`.
 ## Prerequisites
 
 - `git` and `python3`. `gh` (authenticated) for PR targets.
-- `yscope-rust-linter`, optional but expected. Install it with
-  `cargo install --git https://github.com/LinZhihao-723/yscope-rust-linter --locked`, or set
-  `YSCOPE_RUST_LINTER` to a binary. `setup.sh` records the binary it finds in the bundle, so
-  `run-linter.sh` uses it even without `YSCOPE_RUST_LINTER` set. Set `YSCOPE_RUST_LINTER_DOCS` to a
-  checkout's `docs/rules` directory to read the rule docs locally instead of downloading them.
+- `yscope-linter`, optional but expected. Install it with
+  `cargo install --locked --git https://github.com/y-scope/yscope-linter yscope-linter`, or set
+  `YSCOPE_LINTER` to a binary. `setup.sh` records the binary it finds in the bundle, so
+  `run-linter.sh` uses it even without `YSCOPE_LINTER` set. Set `YSCOPE_LINTER_DOCS` to a checkout's
+  `docs/rules` directory to read the rule docs locally instead of downloading them.
 
 ## Configuration (`config.json`)
 

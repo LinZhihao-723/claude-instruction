@@ -146,9 +146,9 @@ def resolve_doc(name, local_path, url, bundle):
 def resolve_linter_docs(rules, url_template, bundle):
     """Returns `({rule: doc}, suppression_doc)`, each a local path or a URL.
 
-    `YSCOPE_RUST_LINTER_DOCS` may name a checkout's `docs/rules` directory to read them from.
+    `YSCOPE_LINTER_DOCS` may name a checkout's `docs/rules` directory to read them from.
     """
-    local_dir = os.environ.get("YSCOPE_RUST_LINTER_DOCS")
+    local_dir = os.environ.get("YSCOPE_LINTER_DOCS")
     local_dir = Path(local_dir) if local_dir else None
     rule_docs = {
         rule: resolve_doc(
@@ -197,7 +197,7 @@ def write_bundle(args):
         for row in guide_index(guides_dir):
             file.write("\t".join(row) + "\n")
         for rule in rules + LINTER_META_CODES:
-            file.write(f"linter:{rule}\t-\tyscope-rust-linter `{rule}`\n")
+            file.write(f"linter:{rule}\t-\tyscope-linter `{rule}`\n")
 
     pr = None
     if args.pr_json:
@@ -213,7 +213,7 @@ def write_bundle(args):
     untracked = [line for line in args.untracked.splitlines() if line]
     if untracked:
         (bundle / "untracked-rs.txt").write_text("\n".join(untracked) + "\n", encoding="utf-8")
-    linter_binary = os.environ.get("YSCOPE_RUST_LINTER") or shutil.which("yscope-rust-linter")
+    linter_binary = os.environ.get("YSCOPE_LINTER") or shutil.which("yscope-linter")
     rule_docs, suppression_doc = resolve_linter_docs(
         rules, linter_config.get("rule_doc_url", ""), bundle
     )
@@ -272,9 +272,9 @@ def write_bundle(args):
     )
     if linter_binary is None:
         warn(
-            "yscope-rust-linter isn't installed, so linter runs will fail. Install it with "
-            "`cargo install --git https://github.com/LinZhihao-723/yscope-rust-linter --locked`, "
-            "or point YSCOPE_RUST_LINTER at a binary."
+            "yscope-linter isn't installed, so linter runs will fail. Install it with "
+            "`cargo install --locked --git https://github.com/y-scope/yscope-linter yscope-linter`"
+            ", or point YSCOPE_LINTER at a binary."
         )
     if untracked:
         warn(

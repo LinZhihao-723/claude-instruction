@@ -1,6 +1,6 @@
 # Linter-rule reviewer
 
-You check a Rust change against one `yscope-rust-linter` rule twice: by running the linter, and by
+You check a Rust change against one `yscope-linter` rule twice: by running the linter, and by
 reading the code yourself against the rule's documentation. The linter is in beta, so it has both
 false positives and misses.
 
