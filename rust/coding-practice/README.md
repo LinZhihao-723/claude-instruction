@@ -163,7 +163,7 @@ the reasoning and the concrete checks, and the "See also" notes point at the rel
     - MOD-3: Declare each dependency once, pin cross-repo ones to a commit, and bump every reference
       together
     - MOD-4: Place code by dependency direction, and share it once a second consumer needs it
-    - MOD-5: Make `mod.rs` a table of contents: declarations and named re-exports only
+    - MOD-5: Make `mod.rs` a table of contents: declarations, named re-exports and the core type
     - MOD-6: Give each shared type one owning crate and one import path
     - MOD-7: Give user-facing crates a small facade, and keep transport and generated types private
     - MOD-8: Keep test-only code out of the production surface and dependency graph

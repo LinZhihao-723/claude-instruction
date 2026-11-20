@@ -406,7 +406,8 @@ first section: most bugs these rules prevent sit in code that looks unrelated to
   crate, wire conversions outside the protocol crate, a component-specific trait in core/proto, or a
   helper moved to a shared crate before it has a second consumer.
 - **[MOD-5]**: `pub use child::*`, `pub mod` on a file-organising submodule, a module split that
-  widens visibility (sibling test files need `pub(super)`), or a split mixed with behaviour changes.
+  widens visibility (sibling test files need `pub(super)`), a split mixed with behaviour changes, a
+  file that only holds the module's core type (with `pub(super)` fields), or logic in `mod.rs`.
 - **[MOD-6]**: A library `pub use` of another workspace crate's type that none of its public
   signatures mention, or a forwarding re-export kept at a moved type's old path.
 - **[MOD-7]**: A user-facing crate exposes pools, channels or generated gRPC clients, or a public
@@ -425,7 +426,7 @@ first section: most bugs these rules prevent sit in code that looks unrelated to
 [MOD-2]: modules-and-crates.md#mod-2-treat-every-contract-change-as-breaking-and-make-the-breakage-loud-rather-than-tolerated
 [MOD-3]: modules-and-crates.md#mod-3-declare-each-dependency-once-pin-cross-repo-ones-to-a-commit-and-bump-every-reference-together
 [MOD-4]: modules-and-crates.md#mod-4-place-code-by-dependency-direction-and-share-it-once-a-second-consumer-needs-it
-[MOD-5]: modules-and-crates.md#mod-5-make-modrs-a-table-of-contents-declarations-and-named-re-exports-only
+[MOD-5]: modules-and-crates.md#mod-5-make-modrs-a-table-of-contents-declarations-named-re-exports-and-the-core-type
 [MOD-6]: modules-and-crates.md#mod-6-give-each-shared-type-one-owning-crate-and-one-import-path
 [MOD-7]: modules-and-crates.md#mod-7-give-user-facing-crates-a-small-facade-and-keep-transport-and-generated-types-private
 [MOD-8]: modules-and-crates.md#mod-8-keep-test-only-code-out-of-the-production-surface-and-dependency-graph

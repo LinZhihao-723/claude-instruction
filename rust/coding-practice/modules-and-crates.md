@@ -249,12 +249,16 @@ shared code goes, and this rule says when code counts as shared.
 - [spider `spider-proto-rust/src/lib.rs`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-proto-rust/src/lib.rs#L3-L51): generated code plus wire/domain conversion modules only
 - [spider `spider-utils/Cargo.toml`](https://github.com/y-scope/spider/blob/d229555f31b40c63e2196a6d505cbbcc692cb91e/components/spider-utils/Cargo.toml#L10-L21): `[dependencies]` lists no workspace crate
 
-## MOD-5: Make `mod.rs` a table of contents: declarations and named re-exports only
+## MOD-5: Make `mod.rs` a table of contents: declarations, named re-exports and the core type
 
-**Rule.** A multi-file module's `mod.rs` (or parent file) only declares submodules and re-exports
-items by name: `pub use` for the API and `pub(crate) use` for crate-internal entry points. A
-submodule that only organises files stays private. Use `pub mod` only for a namespace that is itself
-part of the API. Never write `pub use child::*`.
+**Rule.** A multi-file module's `mod.rs` (or parent file) declares submodules and re-exports items
+by name: `pub use` for the API and `pub(crate) use` for crate-internal entry points. It may also
+define the module's core type, whose behaviour the submodules implement in their own `impl` blocks,
+and small types that every submodule shares. Keep these to the definition, derives, constructor and
+trivial accessors; every operation lives in a submodule. Leave the core type's fields private rather
+than `pub(super)`: the submodules are its descendants, so they can already read them. A submodule
+that only organises files stays private. Use `pub mod` only for a namespace that is itself part of
+the API. Never write `pub use child::*`.
 
 **Why.** A glob re-export publishes every `pub` item ever added to the child, so a new helper joins
 the crate's API without showing up in any diff. Public file-organising submodules let siblings and
@@ -262,7 +266,11 @@ other crates reach into each other's internals. Before
 [y-scope/clp#2713](https://github.com/y-scope/clp/pull/2713), `connection` and `cursor` sat beside
 `session` at the crate root, so `session` and `connection` depended on each other's internals
 through `pub(crate)` items. Named re-exports document the contract in one place, and they let the
-files behind the module be rearranged without touching any caller.
+files behind the module be rearranged without touching any caller. A core type defined in `mod.rs`
+widens nothing: Rust makes a module's private items visible to its descendants, so private fields
+there have exactly the reach of `pub(super)` fields in a child file. Moving it into a file of its
+own only adds a path that repeats the module's name (`client::api_client::Client`) and a visibility
+marker on every field.
 
 ```rust,ignore
 // Bad
@@ -286,8 +294,49 @@ pub use open_session::OpenSession;
 pub(crate) use registry::SessionRegistry;
 ```
 
+```rust,ignore
+// Bad: `client/api_client.rs`, a file whose only job is to hold the core type
+pub struct Client {
+    pub(super) sql_pool: sqlx::Pool<sqlx::MySql>,
+    pub(super) config: Config,
+}
+
+// `client/mod.rs`
+mod api_client;
+mod compression;
+mod query;
+
+pub use api_client::Client;
+```
+
+```rust,ignore
+// Good: `client/mod.rs`; `query/` and `compression/` add `impl Client` blocks and read the private
+// fields
+mod compression;
+mod query;
+
+pub use compression::CompressionUsage;
+pub use query::QueryConfig;
+
+#[derive(Clone)]
+pub struct Client {
+    sql_pool: sqlx::Pool<sqlx::MySql>,
+    config: Config,
+}
+
+impl Client {
+    #[must_use]
+    pub const fn new(config: Config, sql_pool: sqlx::Pool<sqlx::MySql>) -> Self {
+        Self { sql_pool, config }
+    }
+}
+```
+
 **Review.**
 - Flag `pub use ...::*`, and `pub mod` on a submodule that only exists to organise files.
+- Flag a file whose only job is to hold the module's core type, and `pub(super)` fields on a core
+  type that could live in `mod.rs`.
+- Flag any function in `mod.rs` beyond a constructor or a trivial accessor of a type defined there.
 - When a large file is split into a module directory, check that nothing new became visible outside
   the parent. Items that tests in sibling files use get `pub(super)`, not `pub(crate)`.
 - Ask for the split to land as a move-only PR, separate from any behaviour change. Verify it with
@@ -300,7 +349,8 @@ See also: coding-style.md § Module Organization.
 - [y-scope/clp#2713](https://github.com/y-scope/clp/pull/2713): turns `session` into a module that owns `connection` and `cursor`
 - [y-scope/spider#382](https://github.com/y-scope/spider/pull/382): converts multi-file modules to the `mod.rs` layout
 - [y-scope/spider#542](https://github.com/y-scope/spider/pull/542): move-only split of `db/mariadb.rs`, checked with `git diff --color-moved`
-- [y-scope/spider#555](https://github.com/y-scope/spider/pull/555): `mod.rs` holds only submodule declarations and named re-exports
+- [y-scope/spider#555](https://github.com/y-scope/spider/pull/555): `mod.rs` holds only submodule declarations and named re-exports, the layout for a module without a core type
+- [y-scope/clp#2732](https://github.com/y-scope/clp/pull/2732): splits `api-server`'s `client`; its `api_client.rs` holds only the `Client` that `mod.rs` could define (the Bad example)
 - [clp `clp-rust-libs/query-result-listener/src/session/mod.rs`](https://github.com/y-scope/clp/blob/2c617be50c21aa66968033bbcaefc4c2d8665fa2/components/clp-rust-libs/query-result-listener/src/session/mod.rs#L3-L19): private submodules with named `pub` and `pub(crate)` re-exports
 
 ## MOD-6: Give each shared type one owning crate and one import path
@@ -546,7 +596,8 @@ derive = ["dep:spider-tdl-derive"]
   wire conversions outside the protocol crate, a component-specific trait in core/proto, or a helper
   moved to a shared crate before it has a second consumer.
 - **MOD-5**: `pub use child::*`, `pub mod` on a file-organising submodule, a module split that
-  widens visibility (sibling test files need `pub(super)`), or a split mixed with behaviour changes.
+  widens visibility (sibling test files need `pub(super)`), a split mixed with behaviour changes, a
+  file that only holds the module's core type (with `pub(super)` fields), or logic in `mod.rs`.
 - **MOD-6**: A library `pub use` of another workspace crate's type that none of its public
   signatures mention, or a forwarding re-export kept at a moved type's old path.
 - **MOD-7**: A user-facing crate exposes pools, channels or generated gRPC clients, or a public
