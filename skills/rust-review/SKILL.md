@@ -16,8 +16,9 @@ review, or pass `--repo <dir>` to `setup.sh`.
 - `git` and `python3`. `gh` (authenticated) for PR targets.
 - `yscope-rust-linter`, optional but expected. Install it with
   `cargo install --git https://github.com/LinZhihao-723/yscope-rust-linter --locked`, or set
-  `YSCOPE_RUST_LINTER` to a binary. Set `YSCOPE_RUST_LINTER_DOCS` to a checkout's `docs/rules`
-  directory to read the rule docs locally instead of downloading them.
+  `YSCOPE_RUST_LINTER` to a binary. `setup.sh` records the binary it finds in the bundle, so
+  `run-linter.sh` uses it even without `YSCOPE_RUST_LINTER` set. Set `YSCOPE_RUST_LINTER_DOCS` to a
+  checkout's `docs/rules` directory to read the rule docs locally instead of downloading them.
 
 ## Configuration (`config.json`)
 

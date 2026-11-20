@@ -1,8 +1,20 @@
 {
   "base_branch": "main",
   "linter": {
-    "rules": ["comment-greedy-wrap", "errors-doc"],
-    "double_check": ["comment-greedy-wrap", "errors-doc"],
+    "rules": [
+      "comment-greedy-wrap",
+      "errors-doc",
+      "symbol-order",
+      "type-params-doc",
+      "trait-params-doc"
+    ],
+    "double_check": [
+      "comment-greedy-wrap",
+      "errors-doc",
+      "symbol-order",
+      "type-params-doc",
+      "trait-params-doc"
+    ],
     "include_tests": false,
     "rule_doc_url": "https://raw.githubusercontent.com/LinZhihao-723/yscope-rust-linter/main/docs/rules/{rule}.md"
   }

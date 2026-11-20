@@ -12,6 +12,7 @@ trap 'rm -rf "${work_dir}"' EXIT
 python3 -B - "${skill_dir}" "${work_dir}" <<'PY'
 import copy
 import json
+import os
 import re
 import subprocess
 import sys
@@ -108,6 +109,27 @@ check("a diff that applies is kept", checked[0]["diff"] == diffs["good"])
 check("a diff with wrong hunk counts is recounted", "@@ -5,3 +5,3 @@" in (checked[1]["diff"] or ""))
 check("a diff that doesn't apply is set to null", checked[2]["diff"] is None)
 check("check-diffs.sh leaves the worktree untouched", "line 2\n" in (repo / "lib.rs").read_text())
+
+# run-linter.sh falls back to the bundle's `linter.binary` when YSCOPE_RUST_LINTER is unset.
+stub = work_dir / "stub-linter"
+stub.write_text('#!/usr/bin/env bash\necho "stub-linter $*"\n', encoding="utf-8")
+stub.chmod(0o755)
+linter_bundle = work_dir / "linter-bundle"
+linter_bundle.mkdir()
+rust_review.write_json(
+    linter_bundle / "meta.json",
+    {"worktree": str(repo), "linter": {"binary": str(stub), "include_tests": False}},
+)
+(linter_bundle / "diff-rs-U0.patch").write_text(diffs["good"], encoding="utf-8")
+env = {k: v for k, v in os.environ.items() if k != "YSCOPE_RUST_LINTER"}
+result = subprocess.run(
+    [str(skill_dir / "scripts" / "run-linter.sh"), "errors-doc", str(linter_bundle)],
+    capture_output=True,
+    text=True,
+    env=env,
+)
+check("run-linter.sh exits 0 with the meta.json binary", result.returncode == 0, result.stderr)
+check("run-linter.sh runs the meta.json binary", result.stdout.startswith("stub-linter --rule"))
 
 # Every reference the prompts, SKILL.md and the example report cite exists in the guides.
 guides_dir = (skill_dir / ".." / ".." / "rust").resolve()
